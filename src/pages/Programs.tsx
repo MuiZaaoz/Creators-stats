@@ -40,55 +40,63 @@ export default function Programs() {
     <div style={{ padding: '20px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
       <PageHeader
         title={t('programs')}
-        actions={
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ {t('add')}</button>
-        }
+        subtitle={lang === 'th' ? 'ผลงานและการจัดอันดับแต่ละโปรแกรม' : 'Performance and ranking per program'}
       />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {programs.map(p => (
-          <button key={p.id}
-            onClick={() => selectProgram(p)}
-            style={{
-              padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-              background: selected?.id === p.id ? p.color : 'var(--surface2)',
-              color: selected?.id === p.id ? '#fff' : 'var(--text2)',
-              border: '1px solid ' + (selected?.id === p.id ? p.color : 'var(--border)'),
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-            <span style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: selected?.id === p.id ? '#ffffff88' : p.color,
-            }} />
-            {p.name}
-            <span style={{ fontSize: 11, opacity: 0.7 }}>({p.creator_count})</span>
-          </button>
-        ))}
+      {/* Program selector (dropdown) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+        <span style={{ fontWeight: 700, fontSize: 14 }}>{t('programs')}</span>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <select
+            value={selected?.id || ''}
+            onChange={(e) => { const p = programs.find(x => x.id === Number(e.target.value)); if (p) selectProgram(p); }}
+            style={{ minWidth: 220, fontWeight: 600, paddingRight: 28 }}
+          >
+            {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {selected && <span style={{ width: 12, height: 12, borderRadius: '50%', background: selected.color }} />}
+        </div>
+        {selected && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" onClick={() => setShowModal(true)}>+ {t('add')}</button>
+            <button className="btn btn-secondary" onClick={() => setEditModal(selected)}>{t('edit')}</button>
+            <button className="btn btn-danger" onClick={async () => {
+              if (!confirm('ลบโปรแกรมนี้?')) return;
+              await api.programs.delete(selected.id);
+              load();
+            }}>{t('delete')}</button>
+          </div>
+        )}
       </div>
 
       {selected && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div>
-              <h2 style={{ fontSize: 17, fontWeight: 700, color: selected.color }}>{selected.name}</h2>
-              <div style={{ fontSize: 12, color: 'var(--text2)' }}>{selected.game_name || '-'}</div>
+          {/* Inline summary */}
+          {stats && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginBottom: 16, fontSize: 13, color: 'var(--text2)', flexWrap: 'wrap' }}>
+              <span><span style={{ color: 'var(--text)', fontWeight: 700 }}>{stats.creators}</span> {t('creators')}</span>
+              <span><span style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(stats.total_views)}</span> {t('views')}</span>
+              <span><span style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(stats.total_engagement)}</span> {t('engagement')}</span>
+              <span><span style={{ color: 'var(--text)', fontWeight: 700 }}>{stats.total_episodes}</span> {t('episodes')}</span>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-secondary" onClick={() => setEditModal(selected)}>{t('edit')}</button>
-              <button className="btn btn-danger" onClick={async () => {
-                if (!confirm('ลบโปรแกรมนี้?')) return;
-                await api.programs.delete(selected.id);
-                load();
-              }}>{t('delete')}</button>
+          )}
+
+          {/* Calc-table heading */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <h2 style={{ fontSize: 16, fontWeight: 800 }}>{lang === 'th' ? 'ตารางคำนวณโปรแกรม' : 'Program Calc Table'}</h2>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
+                {lang === 'th' ? 'กดลูกศรเพื่อกางคลิป · คลิกลิงก์เพื่อดูตัวอย่าง' : 'Expand rows to see clips · click links to preview'}
+              </div>
             </div>
           </div>
 
           {stats && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-              <StatCard label={t('views')} value={stats.total_views} color={selected.color} />
-              <StatCard label={t('engagement')} value={stats.total_engagement} />
-              <StatCard label={t('episodes')} value={stats.total_episodes} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
               <StatCard label={t('creators')} value={stats.creators} />
+              <StatCard label={'Total ' + t('views')} value={stats.total_views} color={selected.color} />
+              <StatCard label={'Total ' + t('engagement')} value={stats.total_engagement} />
+              <StatCard label={'Total ' + t('episodes')} value={stats.total_episodes} />
             </div>
           )}
 
@@ -165,10 +173,10 @@ export default function Programs() {
       )}
 
       {showModal && (
-        <ProgramModal games={games} t={t} onClose={() => setShowModal(false)} onSave={() => { setShowModal(false); load(); }} />
+        <ProgramModal games={games} t={t} lang={lang} onClose={() => setShowModal(false)} onSave={() => { setShowModal(false); load(); }} />
       )}
       {editModal && (
-        <ProgramModal games={games} t={t} program={editModal}
+        <ProgramModal games={games} t={t} lang={lang} program={editModal}
           onClose={() => setEditModal(null)}
           onSave={() => { setEditModal(null); load(); }} />
       )}
@@ -176,7 +184,7 @@ export default function Programs() {
   );
 }
 
-function ProgramModal({ games, t, program, onClose, onSave }: any) {
+function ProgramModal({ games, t, lang, program, onClose, onSave }: any) {
   const [form, setForm] = useState(program ? { ...program } : {
     name: '', game_id: games[0]?.id || '', color: '#5b5bd6',
     types: ['Long', 'Short'],

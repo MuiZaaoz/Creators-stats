@@ -1,142 +1,150 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { useT } from '../lib/i18n';
+import { api } from '../lib/api';
 
-const NAV = [
-  { key: 'dashboard', path: '/', icon: '◈' },
-  { key: 'creators', path: '/creators', icon: '◉' },
-  { key: 'programs', path: '/programs', icon: '▣' },
-  { key: 'collect', path: '/collect', icon: '⊕' },
-  { key: 'editor', path: '/editor', icon: '✦' },
-  { key: 'analytics', path: '/analytics', icon: '◎' },
-  { key: 'export', path: '/export', icon: '↗' },
-  { key: 'games', path: '/games', icon: '⬡' },
-  { key: 'rewards', path: '/rewards', icon: '◆' },
-  { key: 'auditLog', path: '/audit', icon: '≡' },
-];
-
-const NAV_BOTTOM = [
-  { key: 'settings', path: '/settings', icon: '⚙' },
-  { key: 'profile', path: '/profile', icon: '○' },
+const SECTIONS = [
+  {
+    title: null,
+    items: [{ key: 'dashboard', path: '/', icon: '▦' }],
+  },
+  {
+    title: 'การจัดการ',
+    titleEn: 'Management',
+    items: [
+      { key: 'creators', path: '/creators', icon: '◉' },
+      { key: 'programs', path: '/programs', icon: '▤' },
+      { key: 'games', path: '/games', icon: '⬡' },
+      { key: 'rewards', path: '/rewards', icon: '◆' },
+    ],
+  },
+  {
+    title: 'ข้อมูล',
+    titleEn: 'Data',
+    items: [
+      { key: 'collect', path: '/collect', icon: '⇲' },
+      { key: 'editor', path: '/editor', icon: '☑', badge: true },
+    ],
+  },
+  {
+    title: 'รายงาน',
+    titleEn: 'Reports',
+    items: [
+      { key: 'analytics', path: '/analytics', icon: '◷' },
+      { key: 'export', path: '/export', icon: '↧' },
+      { key: 'auditLog', path: '/audit', icon: '≡' },
+    ],
+  },
+  {
+    title: 'ระบบ',
+    titleEn: 'System',
+    items: [
+      { key: 'settings', path: '/settings', icon: '⚙' },
+      { key: 'profile', path: '/profile', icon: '○' },
+    ],
+  },
 ];
 
 export default function Layout() {
   const { lang, setLang, currentUser } = useAppStore();
   const t = useT(lang);
+  const [pending, setPending] = useState(0);
+
+  useEffect(() => {
+    api.contents.review().then((items) => {
+      setPending(items.filter((x: any) => x.status === 'pending').length);
+    }).catch(() => {});
+  }, []);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar t={t} lang={lang} setLang={setLang} currentUser={currentUser} />
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
+      <nav style={{
+        width: 'var(--sidebar-w)', background: 'var(--surface)',
+        borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0,
+      }}>
+        {/* Logo */}
+        <div style={{ padding: '18px 18px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 9,
+              background: 'linear-gradient(135deg,#1c1c24,#2d2640)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 16, color: '#fff', fontWeight: 800,
+            }}>C</div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.1, letterSpacing: '-0.01em' }}>CreatorHub</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)' }}>Program Management</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Nav */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px' }}>
+          {SECTIONS.map((sec, si) => (
+            <div key={si} style={{ marginBottom: 10 }}>
+              {sec.title && (
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', padding: '8px 10px 4px' }}>
+                  {lang === 'th' ? sec.title : sec.titleEn}
+                </div>
+              )}
+              {sec.items.map((item: any) => (
+                <NavLink
+                  key={item.key}
+                  to={item.path}
+                  end={item.path === '/'}
+                  style={({ isActive }) => ({
+                    display: 'flex', alignItems: 'center', gap: 11,
+                    padding: '8px 10px', borderRadius: 8, marginBottom: 2,
+                    fontSize: 13.5, fontWeight: isActive ? 700 : 500,
+                    color: isActive ? 'var(--accent)' : 'var(--text2)',
+                    background: isActive ? 'var(--accent-bg)' : 'transparent',
+                  })}
+                >
+                  <span style={{ fontSize: 15, width: 18, textAlign: 'center' }}>{item.icon}</span>
+                  <span style={{ flex: 1 }}>{t(item.key)}</span>
+                  {item.badge && pending > 0 && (
+                    <span style={{
+                      background: 'var(--red)', color: '#fff', borderRadius: 10,
+                      minWidth: 18, height: 18, padding: '0 5px', fontSize: 11, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{pending}</span>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Footer: lang + user */}
+        <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+            {(['th', 'en'] as const).map((l) => (
+              <button key={l} onClick={() => setLang(l)}
+                style={{
+                  flex: 1, padding: '5px 0', borderRadius: 6,
+                  background: lang === l ? 'var(--accent)' : 'var(--surface2)',
+                  color: lang === l ? '#fff' : 'var(--text2)',
+                  fontSize: 11, fontWeight: 700, border: 'none',
+                }}>{l.toUpperCase()}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '4px 6px' }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: '50%', background: 'var(--accent)', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
+            }}>{currentUser.name[0]}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)' }}>{currentUser.role === 'Admin' ? 'Administrator' : currentUser.role}</div>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       <main style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
         <Outlet />
       </main>
     </div>
-  );
-}
-
-function Sidebar({ t, lang, setLang, currentUser }: any) {
-  return (
-    <nav style={{
-      width: 'var(--sidebar-w)',
-      background: 'var(--surface)',
-      borderRight: '1px solid var(--border)',
-      display: 'flex',
-      flexDirection: 'column',
-      flexShrink: 0,
-    }}>
-      {/* Logo */}
-      <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: 'linear-gradient(135deg, var(--accent), var(--accent2))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, color: '#fff', fontWeight: 700,
-          }}>C</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>Creator</div>
-            <div style={{ fontSize: 10, color: 'var(--text2)', letterSpacing: '0.1em' }}>HUB PLATFORM</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Nav */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
-        {NAV.map(item => (
-          <NavLink
-            key={item.key}
-            to={item.path}
-            end={item.path === '/'}
-            style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '8px 10px', borderRadius: 7,
-              marginBottom: 2,
-              fontSize: 13, fontWeight: 500,
-              color: isActive ? '#fff' : 'var(--text2)',
-              background: isActive ? 'var(--accent)' : 'transparent',
-              transition: 'all 0.15s',
-            })}
-          >
-            <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{item.icon}</span>
-            {t(item.key)}
-          </NavLink>
-        ))}
-      </div>
-
-      {/* Bottom */}
-      <div style={{ padding: '8px 8px', borderTop: '1px solid var(--border)' }}>
-        {NAV_BOTTOM.map(item => (
-          <NavLink
-            key={item.key}
-            to={item.path}
-            style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '8px 10px', borderRadius: 7,
-              marginBottom: 2,
-              fontSize: 13, fontWeight: 500,
-              color: isActive ? '#fff' : 'var(--text2)',
-              background: isActive ? 'var(--accent)' : 'transparent',
-            })}
-          >
-            <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{item.icon}</span>
-            {t(item.key)}
-          </NavLink>
-        ))}
-
-        {/* Lang Toggle */}
-        <div style={{ display: 'flex', gap: 4, padding: '6px 10px', marginTop: 4 }}>
-          {(['th', 'en'] as const).map(l => (
-            <button
-              key={l}
-              onClick={() => setLang(l)}
-              style={{
-                flex: 1, padding: '4px 0', borderRadius: 5,
-                background: lang === l ? 'var(--accent)' : 'var(--surface2)',
-                color: lang === l ? '#fff' : 'var(--text2)',
-                fontSize: 11, fontWeight: 700,
-                border: '1px solid var(--border)',
-              }}
-            >
-              {l.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
-        {/* User */}
-        <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%',
-            background: 'var(--accent)', color: '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700,
-          }}>{currentUser.name[0]}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.name}</div>
-            <div style={{ fontSize: 10, color: 'var(--text2)' }}>{currentUser.role}</div>
-          </div>
-        </div>
-      </div>
-    </nav>
   );
 }
