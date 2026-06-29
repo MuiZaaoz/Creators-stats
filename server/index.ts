@@ -49,7 +49,10 @@ const PORT = process.env.PORT || 3001;
 
 async function start() {
   await initDb();
-  await seed();
+  // Sample data is only inserted when SEED_SAMPLE_DATA=true (off by default).
+  if (process.env.SEED_SAMPLE_DATA === 'true') {
+    await seed();
+  }
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 }
 

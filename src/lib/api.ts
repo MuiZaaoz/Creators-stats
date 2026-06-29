@@ -36,6 +36,8 @@ export const api = {
     updateLink: (id: number, body: any) => put<any>(`/contents/links/${id}`, body),
     review: () => get<any[]>('/contents/review'),
     updateReview: (id: number, body: any) => put<any>(`/contents/review/${id}`, body),
+    import: (body: any) => post<any>('/contents/import', body),
+    aiRefresh: (body: any) => post<any>('/contents/ai-refresh', body),
   },
   games: {
     list: () => get<any[]>('/games'),
