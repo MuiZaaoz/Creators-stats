@@ -1,5 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { initDb } from './db.js';
 import { seed } from './seed.js';
 import { programsRouter } from './routes/programs.js';
@@ -29,5 +32,21 @@ app.use('/api/audit', auditRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/export', exportRouter);
 
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+// Serve the built frontend (production). Vite outputs to ../dist.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distPath = path.join(__dirname, '..', 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  // SPA fallback: serve index.html for any non-API GET route
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(distPath, 'index.html'));
+    }
+    next();
+  });
+}
+
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`API server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
