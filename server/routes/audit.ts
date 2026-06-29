@@ -3,7 +3,7 @@ import { db } from '../db.js';
 
 export const auditRouter = Router();
 
-auditRouter.get('/', (req, res) => {
+auditRouter.get('/', async (req, res) => {
   const { search, tag, limit = 50, offset = 0 } = req.query;
   let q = 'SELECT * FROM audit_logs WHERE 1=1';
   const params: any[] = [];
@@ -11,12 +11,12 @@ auditRouter.get('/', (req, res) => {
   if (tag) { q += ' AND tag = ?'; params.push(tag); }
   q += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
   params.push(Number(limit), Number(offset));
-  const items = db.prepare(q).all(...params);
-  const total = (db.prepare('SELECT COUNT(*) as n FROM audit_logs').get() as any).n;
-  res.json({ items, total });
+  const items = await db.all(q, params);
+  const totalRow = await db.get('SELECT COUNT(*) as n FROM audit_logs');
+  res.json({ items, total: totalRow ? Number(totalRow.n) : 0 });
 });
 
-auditRouter.get('/tags', (_req, res) => {
-  const tags = db.prepare('SELECT DISTINCT tag, color FROM audit_logs WHERE tag IS NOT NULL ORDER BY tag').all();
+auditRouter.get('/tags', async (_req, res) => {
+  const tags = await db.all('SELECT DISTINCT tag, color FROM audit_logs WHERE tag IS NOT NULL ORDER BY tag');
   res.json(tags);
 });

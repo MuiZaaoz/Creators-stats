@@ -15,9 +15,6 @@ import { auditRouter } from './routes/audit.js';
 import { usersRouter } from './routes/users.js';
 import { exportRouter } from './routes/export.js';
 
-initDb();
-seed();
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -49,4 +46,14 @@ if (fs.existsSync(distPath)) {
 }
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+
+async function start() {
+  await initDb();
+  await seed();
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}
+
+start().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});

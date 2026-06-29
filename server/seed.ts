@@ -1,15 +1,15 @@
 import { db } from './db.js';
 
-export function seed() {
-  const count = (db.prepare('SELECT COUNT(*) as n FROM creators').get() as any).n;
-  if (count > 0) return; // Already seeded
+export async function seed() {
+  const row = await db.get('SELECT COUNT(*) as n FROM creators');
+  if (row && Number(row.n) > 0) return; // Already seeded
 
   // Games
   const games = ['RoV (Arena of Valor)', 'Free Fire', 'PUBG Mobile', 'Valorant', 'Minecraft', 'Genshin Impact'];
   const gameIds: Record<string, number> = {};
   for (const g of games) {
-    const r = db.prepare('INSERT OR IGNORE INTO games (name) VALUES (?)').run(g);
-    gameIds[g] = (r.lastInsertRowid as number) || (db.prepare('SELECT id FROM games WHERE name=?').get(g) as any).id;
+    const r = await db.run('INSERT OR IGNORE INTO games (name) VALUES (?)', [g]);
+    gameIds[g] = r.lastInsertRowid || (await db.get('SELECT id FROM games WHERE name=?', [g])).id;
   }
 
   // Roles
@@ -20,7 +20,7 @@ export function seed() {
     { name: 'Viewer', is_default: 1, permissions: JSON.stringify({ dashboard: 'view', creators: 'view', programs: 'view', collect: 'off', editor: 'off', analytics: 'view', export: 'view', games: 'view', rewards: 'off', settings: 'off' }) },
   ];
   for (const r of defaultRoles) {
-    db.prepare('INSERT OR IGNORE INTO roles (name, is_default, permissions) VALUES (?, ?, ?)').run(r.name, r.is_default, r.permissions);
+    await db.run('INSERT OR IGNORE INTO roles (name, is_default, permissions) VALUES (?, ?, ?)', [r.name, r.is_default, r.permissions]);
   }
 
   // Programs
@@ -32,8 +32,8 @@ export function seed() {
   ];
   const progIds: Record<string, number> = {};
   for (const p of programData) {
-    const r = db.prepare('INSERT INTO programs (name, game_id, color, types) VALUES (?, ?, ?, ?)').run(p.name, gameIds[p.game], p.color, p.types);
-    progIds[p.name] = r.lastInsertRowid as number;
+    const r = await db.run('INSERT INTO programs (name, game_id, color, types) VALUES (?, ?, ?, ?)', [p.name, gameIds[p.game], p.color, p.types]);
+    progIds[p.name] = r.lastInsertRowid;
   }
 
   // Creators
@@ -49,10 +49,9 @@ export function seed() {
   ];
   const creatorIds: Record<string, number> = {};
   for (const c of creatorData) {
-    const r = db.prepare(`INSERT INTO creators (name, type, program_id, avatar_color, youtube_handle, facebook_handle, tiktok_handle, instagram_handle, yt_followers, fb_followers, tt_followers, ig_followers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      c.name, c.type, progIds[c.program], c.color, c.yt, c.fb, c.tt, c.ig, c.yt_f, c.fb_f, c.tt_f, c.ig_f
-    );
-    creatorIds[c.name] = r.lastInsertRowid as number;
+    const r = await db.run(`INSERT INTO creators (name, type, program_id, avatar_color, youtube_handle, facebook_handle, tiktok_handle, instagram_handle, yt_followers, fb_followers, tt_followers, ig_followers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [c.name, c.type, progIds[c.program], c.color, c.yt, c.fb, c.tt, c.ig, c.yt_f, c.fb_f, c.tt_f, c.ig_f]);
+    creatorIds[c.name] = r.lastInsertRowid;
   }
 
   // Episodes & Content Links
@@ -100,12 +99,11 @@ export function seed() {
 
   for (const ep of episodes) {
     const cid = creatorIds[ep.creator];
-    const epRow = db.prepare('INSERT INTO episodes (creator_id, title, type, published_at) VALUES (?, ?, ?, ?)').run(cid, ep.title, ep.type, ep.date);
-    const epId = epRow.lastInsertRowid as number;
+    const epRow = await db.run('INSERT INTO episodes (creator_id, title, type, published_at) VALUES (?, ?, ?, ?)', [cid, ep.title, ep.type, ep.date]);
+    const epId = epRow.lastInsertRowid;
     for (const pl of ep.platforms) {
-      db.prepare('INSERT INTO content_links (episode_id, platform, url, views, engagement, likes, comments, shares, saves, uv, video_views) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-        epId, pl.p, pl.url, pl.v, pl.e, pl.l, pl.c, pl.s, pl.sv, (pl as any).uv || 0, (pl as any).video_views || 0
-      );
+      await db.run('INSERT INTO content_links (episode_id, platform, url, views, engagement, likes, comments, shares, saves, uv, video_views) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [epId, pl.p, pl.url, pl.v, pl.e, pl.l, pl.c, pl.s, pl.sv, (pl as any).uv || 0, (pl as any).video_views || 0]);
     }
   }
 
@@ -114,13 +112,13 @@ export function seed() {
     const cid = creatorIds[c.name];
     const pid = progIds[c.program];
     const amount = Math.round(Math.random() * 150000 + 50000);
-    db.prepare('INSERT OR IGNORE INTO rewards (creator_id, program_id, amount) VALUES (?, ?, ?)').run(cid, pid, amount);
+    await db.run('INSERT OR IGNORE INTO rewards (creator_id, program_id, amount) VALUES (?, ?, ?)', [cid, pid, amount]);
   }
 
   // Users
-  db.prepare('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)').run('Admin User', 'admin', 'admin@creatorhub.th', 'hashed_pw', 'Admin');
-  db.prepare('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)').run('Som Editor', 'som.editor', 'som@creatorhub.th', 'hashed_pw', 'Editor');
-  db.prepare('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)').run('Ploy Manee', 'ploy.manee', 'ploy@creatorhub.th', 'hashed_pw', 'Manager');
+  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Admin User', 'admin', 'admin@creatorhub.th', 'hashed_pw', 'Admin']);
+  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Som Editor', 'som.editor', 'som@creatorhub.th', 'hashed_pw', 'Editor']);
+  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Ploy Manee', 'ploy.manee', 'ploy@creatorhub.th', 'hashed_pw', 'Manager']);
 
   // Audit logs
   const auditEntries = [
@@ -131,13 +129,13 @@ export function seed() {
     { user: 'Ploy Manee', action: 'แก้ไขข้อมูล Kittipong R.', tag: 'แก้ไข', color: '#f59e0b', detail: 'Updated creator profile' },
   ];
   for (const a of auditEntries) {
-    db.prepare('INSERT INTO audit_logs (user, action, tag, color, detail) VALUES (?, ?, ?, ?, ?)').run(a.user, a.action, a.tag, a.color, a.detail);
+    await db.run('INSERT INTO audit_logs (user, action, tag, color, detail) VALUES (?, ?, ?, ?, ?)', [a.user, a.action, a.tag, a.color, a.detail]);
   }
 
   // Review queue
-  const links = db.prepare('SELECT id FROM content_links LIMIT 5').all() as any[];
+  const links = await db.all('SELECT id FROM content_links LIMIT 5');
   for (const lnk of links) {
-    db.prepare('INSERT INTO review_queue (content_link_id, status, submitted_by) VALUES (?, ?, ?)').run(lnk.id, 'pending', 'Som Editor');
+    await db.run('INSERT INTO review_queue (content_link_id, status, submitted_by) VALUES (?, ?, ?)', [lnk.id, 'pending', 'Som Editor']);
   }
 
   console.log('Database seeded successfully');

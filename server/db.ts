@@ -1,19 +1,49 @@
-import Database from 'better-sqlite3';
+import { createClient, type Client, type InValue } from '@libsql/client';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '..', 'data', 'creator_platform.db');
+// Use Turso (persistent cloud SQLite) when env vars are set, otherwise a local file.
+const TURSO_URL = process.env.TURSO_DATABASE_URL;
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
-import fs from 'fs';
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+let client: Client;
+if (TURSO_URL) {
+  client = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN });
+  console.log('Database: Turso (persistent)');
+} else {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const dataDir = path.join(__dirname, '..', 'data');
+  fs.mkdirSync(dataDir, { recursive: true });
+  const file = path.join(dataDir, 'creator_platform.db');
+  client = createClient({ url: 'file:' + file });
+  console.log('Database: local file (' + file + ')');
+}
 
-export const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// Thin async wrapper around libsql so route code stays close to before.
+export const db = {
+  async all(sql: string, params: InValue[] = []): Promise<any[]> {
+    const r = await client.execute({ sql, args: params });
+    return r.rows as any[];
+  },
+  async get(sql: string, params: InValue[] = []): Promise<any> {
+    const r = await client.execute({ sql, args: params });
+    return (r.rows[0] as any) ?? undefined;
+  },
+  async run(sql: string, params: InValue[] = []): Promise<{ lastInsertRowid: number; changes: number }> {
+    const r = await client.execute({ sql, args: params });
+    return {
+      lastInsertRowid: r.lastInsertRowid != null ? Number(r.lastInsertRowid) : 0,
+      changes: r.rowsAffected,
+    };
+  },
+  async exec(sql: string): Promise<void> {
+    await client.executeMultiple(sql);
+  },
+};
 
-export function initDb() {
-  db.exec(`
+export async function initDb() {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS games (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,

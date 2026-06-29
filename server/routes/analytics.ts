@@ -3,8 +3,8 @@ import { db } from '../db.js';
 
 export const analyticsRouter = Router();
 
-analyticsRouter.get('/overview', (_req, res) => {
-  const totals = db.prepare(`
+analyticsRouter.get('/overview', async (_req, res) => {
+  const totals = await db.get(`
     SELECT
       SUM(cl.views) as total_views,
       SUM(cl.engagement) as total_engagement,
@@ -18,12 +18,12 @@ analyticsRouter.get('/overview', (_req, res) => {
     JOIN episodes e ON cl.episode_id = e.id
     JOIN creators c ON e.creator_id = c.id
     JOIN programs p ON c.program_id = p.id
-  `).get();
+  `);
   res.json(totals);
 });
 
-analyticsRouter.get('/by-platform', (_req, res) => {
-  const data = db.prepare(`
+analyticsRouter.get('/by-platform', async (_req, res) => {
+  const data = await db.all(`
     SELECT cl.platform,
       SUM(cl.views) as total_views,
       SUM(cl.engagement) as total_engagement,
@@ -34,12 +34,12 @@ analyticsRouter.get('/by-platform', (_req, res) => {
     FROM content_links cl
     GROUP BY cl.platform
     ORDER BY total_views DESC
-  `).all();
+  `);
   res.json(data);
 });
 
-analyticsRouter.get('/by-program', (_req, res) => {
-  const data = db.prepare(`
+analyticsRouter.get('/by-program', async (_req, res) => {
+  const data = await db.all(`
     SELECT p.id, p.name, p.color,
       SUM(cl.views) as total_views,
       SUM(cl.engagement) as total_engagement,
@@ -54,11 +54,11 @@ analyticsRouter.get('/by-program', (_req, res) => {
     LEFT JOIN content_links cl ON cl.episode_id = e.id
     GROUP BY p.id
     ORDER BY total_views DESC
-  `).all();
+  `);
   res.json(data);
 });
 
-analyticsRouter.get('/by-creator', (req, res) => {
+analyticsRouter.get('/by-creator', async (req, res) => {
   const { program_id } = req.query;
   let q = `
     SELECT c.id, c.name, c.avatar_color, c.type,
@@ -77,11 +77,11 @@ analyticsRouter.get('/by-creator', (req, res) => {
   const params: any[] = [];
   if (program_id) { q += ' WHERE c.program_id = ?'; params.push(program_id); }
   q += ' GROUP BY c.id ORDER BY total_views DESC';
-  res.json(db.prepare(q).all(...params));
+  res.json(await db.all(q, params));
 });
 
-analyticsRouter.get('/by-type', (_req, res) => {
-  const data = db.prepare(`
+analyticsRouter.get('/by-type', async (_req, res) => {
+  const data = await db.all(`
     SELECT e.type,
       SUM(cl.views) as total_views,
       SUM(cl.engagement) as total_engagement,
@@ -90,15 +90,15 @@ analyticsRouter.get('/by-type', (_req, res) => {
     JOIN content_links cl ON cl.episode_id = e.id
     GROUP BY e.type
     ORDER BY total_views DESC
-  `).all();
+  `);
   res.json(data);
 });
 
-analyticsRouter.get('/comparison', (req, res) => {
+analyticsRouter.get('/comparison', async (req, res) => {
   const { mode = 'program' } = req.query;
 
   if (mode === 'creator') {
-    const data = db.prepare(`
+    const data = await db.all(`
       SELECT c.id, c.name as label, c.avatar_color as color, c.type,
         p.name as group_name,
         SUM(cl.views) as views, SUM(cl.engagement) as engagement,
@@ -110,12 +110,12 @@ analyticsRouter.get('/comparison', (req, res) => {
       LEFT JOIN content_links cl ON cl.episode_id = e.id
       GROUP BY c.id
       ORDER BY views DESC
-    `).all();
+    `);
     return res.json(data);
   }
 
   if (mode === 'platform') {
-    const data = db.prepare(`
+    const data = await db.all(`
       SELECT cl.platform as label, cl.platform as color,
         SUM(cl.views) as views, SUM(cl.engagement) as engagement,
         SUM(cl.likes) as likes, SUM(cl.comments) as comments,
@@ -123,12 +123,11 @@ analyticsRouter.get('/comparison', (req, res) => {
       FROM content_links cl
       GROUP BY cl.platform
       ORDER BY views DESC
-    `).all();
+    `);
     return res.json(data);
   }
 
-  // Default: by program
-  const data = db.prepare(`
+  const data = await db.all(`
     SELECT p.id, p.name as label, p.color,
       SUM(cl.views) as views, SUM(cl.engagement) as engagement,
       SUM(cl.likes) as likes, SUM(cl.comments) as comments,
@@ -140,6 +139,6 @@ analyticsRouter.get('/comparison', (req, res) => {
     LEFT JOIN content_links cl ON cl.episode_id = e.id
     GROUP BY p.id
     ORDER BY views DESC
-  `).all();
+  `);
   res.json(data);
 });
