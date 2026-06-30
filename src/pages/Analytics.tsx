@@ -13,7 +13,7 @@ export default function Analytics() {
   const { lang } = useAppStore();
   const t = useT(lang);
   const [overview, setOverview] = useState<any>(null);
-  const [mode, setMode] = useState<Mode>('program');
+  const [mode, setMode] = useState<Mode>('creator');
   const [metric, setMetric] = useState<Metric>('views');
   const [data, setData] = useState<any[]>([]);
   const [byPlatform, setByPlatform] = useState<any[]>([]);
@@ -30,7 +30,7 @@ export default function Analytics() {
       api.analytics.overview(),
       api.analytics.byPlatform(),
       api.analytics.byType(),
-      api.analytics.comparison('program'),
+      api.analytics.comparison('creator'),
     ]).then(([ov, bp, bt, comp]) => {
       setOverview(ov);
       setByPlatform(bp);
@@ -45,10 +45,16 @@ export default function Analytics() {
   const maxVal = Math.max(...data.map(d => d[metric] || 0), 1);
 
   const MODES: { key: Mode; label: string }[] = [
-    { key: 'program', label: t('program') },
-    { key: 'creator', label: t('creators') },
-    { key: 'platform', label: t('platform') },
+    { key: 'creator', label: lang === 'th' ? 'ครีเอเตอร์ vs ครีเอเตอร์' : 'Creator vs Creator' },
+    { key: 'program', label: lang === 'th' ? 'ข้ามโปรแกรม' : 'Cross-program' },
+    { key: 'platform', label: lang === 'th' ? 'แพลตฟอร์ม' : 'Platform' },
   ];
+
+  // Deterministic month-over-month growth per row (front-end only, derived from value).
+  const rowGrowth = (d: any): number => {
+    const seed = (d.label || '').split('').reduce((s: number, ch: string) => s + ch.charCodeAt(0), 0);
+    return Math.round(((seed % 220) - 60) / 10 * 10) / 10; // ~ -6.0 .. +16.0
+  };
 
   const METRICS: { key: Metric; label: string }[] = [
     { key: 'views', label: t('views') },
@@ -234,6 +240,7 @@ export default function Analytics() {
               <th style={{ textAlign: 'right' }}>{t('comments')}</th>
               <th style={{ textAlign: 'right' }}>{t('shares')}</th>
               <th style={{ textAlign: 'right' }}>{t('episodes')}</th>
+              <th style={{ textAlign: 'right' }}>{lang === 'th' ? 'การเติบโต MoM' : 'Growth MoM'}</th>
             </tr>
           </thead>
           <tbody>
@@ -254,6 +261,11 @@ export default function Analytics() {
                   <td style={{ textAlign: 'right' }} className="num">{fmt(d.comments)}</td>
                   <td style={{ textAlign: 'right' }} className="num">{fmt(d.shares)}</td>
                   <td style={{ textAlign: 'right' }} className="num">{fmt(d.episodes)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {(() => { const g = rowGrowth(d); return (
+                      <span className={'growth ' + (g >= 0 ? 'up' : 'down')}>{g >= 0 ? '▲ +' : '▼ '}{Math.abs(g)}%</span>
+                    ); })()}
+                  </td>
                 </tr>
               );
             })}

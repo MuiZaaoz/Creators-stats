@@ -3,11 +3,13 @@ import { useAppStore } from '../store/appStore';
 import { useT } from '../lib/i18n';
 import { fmt, initials, platformColor, platformInitial } from '../lib/utils';
 
-// Extract a YouTube embed URL from common youtube/youtu.be link shapes.
+// Only embed when the URL carries a real 11-char YouTube id; otherwise show a styled
+// placeholder (the prototype never embeds — sample links are not real videos).
 function youtubeEmbed(url: string): string | null {
   if (!url) return null;
   const u = url.replace(/^https?:\/\//, '');
-  const m = u.match(/youtu\.be\/([A-Za-z0-9_-]+)/) || u.match(/youtube\.com\/(?:watch\?v=|embed\/)([A-Za-z0-9_-]+)/);
+  const m = u.match(/youtu\.be\/([A-Za-z0-9_-]{11})(?:[?&/]|$)/) ||
+            u.match(/youtube\.com\/(?:watch\?v=|embed\/)([A-Za-z0-9_-]{11})(?:[?&/]|$)/);
   if (m) return `https://www.youtube.com/embed/${m[1]}`;
   return null;
 }
@@ -29,28 +31,34 @@ export default function PreviewModal() {
     <div className="modal-overlay" onClick={closePreview}>
       <div className="modal" style={{ maxWidth: 620, padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         {/* Video / thumbnail area */}
-        <div style={{ position: 'relative', background: '#0c0c12', aspectRatio: '16 / 9' }}>
+        <div style={{ position: 'relative', aspectRatio: '16 / 9', borderRadius: 0, overflow: 'hidden' }}>
           {embed ? (
             <iframe src={embed} title={preview.title} allowFullScreen
               style={{ width: '100%', height: '100%', border: 0 }} />
           ) : (
-            <div style={{
-              width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff',
-              background: `linear-gradient(135deg, ${platformColor(preview.platform)}cc, #1c1c24)`,
+            <a href={fullUrl} target="_blank" rel="noreferrer" style={{
+              display: 'flex', flexDirection: 'column', width: '100%', height: '100%',
+              alignItems: 'center', justifyContent: 'center', gap: 14, color: '#fff', cursor: 'pointer',
+              // Diagonal stripe placeholder — matches the prototype
+              background: 'repeating-linear-gradient(135deg,#1c1c24,#1c1c24 12px,#23202e 12px,#23202e 24px)',
             }}>
               <div style={{
-                width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.18)',
+                width: 70, height: 70, borderRadius: '50%',
+                background: platformColor(preview.platform),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
               }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg>
               </div>
-              <div style={{ fontSize: 12, opacity: 0.85 }}>{lang === 'th' ? 'ตัวอย่างวิดีโอ' : 'Video preview'} · {preview.platform}</div>
-            </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, opacity: 0.9 }}>
+                <span className="platform-icon" style={{ background: platformColor(preview.platform), width: 18, height: 18, fontSize: 8 }}>{platformInitial(preview.platform)}</span>
+                {lang === 'th' ? 'กดเพื่อเปิดวิดีโอจริง' : 'Click to open the video'} · {preview.platform}
+              </div>
+            </a>
           )}
           <button onClick={closePreview} style={{
             position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: '50%',
-            background: 'rgba(0,0,0,0.5)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2,
           }}>✕</button>
         </div>
 
