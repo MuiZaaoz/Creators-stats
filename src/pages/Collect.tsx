@@ -14,6 +14,7 @@ export default function Collect() {
   const { lang } = useAppStore();
   const t = useT(lang);
   const [activeTab, setActiveTab] = useState<'manual' | 'upload' | 'ai' | 'web'>('manual');
+  const submitUrl = (typeof window !== 'undefined' ? window.location.origin : '') + '/submit';
   const [creators, setCreators] = useState<any[]>([]);
   const [form, setForm] = useState<any>({
     creator_id: '',
@@ -209,12 +210,19 @@ export default function Collect() {
         <div className="card" style={{ maxWidth: 500 }}>
           <div style={{ fontWeight: 700, marginBottom: 12 }}>Web Submit Link</div>
           <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
-            {lang === 'th' ? 'สร้างลิงก์ให้ครีเอเตอร์กรอกข้อมูลด้วยตัวเอง' : 'Generate a link for creators to self-submit their data.'}
+            {lang === 'th' ? 'ส่งลิงก์นี้ให้ครีเอเตอร์กรอกข้อมูลคอนเทนต์ด้วยตัวเอง ข้อมูลจะเข้าคิวรอ Editor ตรวจสอบ' : 'Share this link so creators can self-submit; entries enter the Editor review queue.'}
           </div>
           <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px', fontFamily: 'monospace', fontSize: 13, marginBottom: 12, color: 'var(--accent2)' }}>
-            https://hub.example.com/submit/abc123
+            {submitUrl}
           </div>
-          <button className="btn btn-secondary">{lang === 'th' ? 'คัดลอกลิงก์' : 'Copy Link'}</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" onClick={() => { navigator.clipboard?.writeText(submitUrl); }}>
+              {lang === 'th' ? 'คัดลอกลิงก์' : 'Copy Link'}
+            </button>
+            <a className="btn btn-primary" href="/submit" target="_blank" rel="noreferrer">
+              {lang === 'th' ? 'เปิดหน้าฟอร์ม ↗' : 'Open Form ↗'}
+            </a>
+          </div>
         </div>
       )}
     </div>
