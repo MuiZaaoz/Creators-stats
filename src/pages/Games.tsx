@@ -4,10 +4,12 @@ import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
 import { fmt, platformColor, platformInitial, relDate, initials } from '../lib/utils';
 import PageHeader from '../components/PageHeader';
+import { usePreviewStore } from '../store/previewStore';
 
 export default function Games() {
   const { lang } = useAppStore();
   const t = useT(lang);
+  const openPreview = usePreviewStore((s) => s.open);
   const [games, setGames] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [contents, setContents] = useState<any[]>([]);
@@ -84,7 +86,11 @@ export default function Games() {
                 </thead>
                 <tbody>
                   {contents.map((c: any) => (
-                    <tr key={c.id}>
+                    <tr key={c.id} style={{ cursor: 'pointer' }}
+                      onClick={() => openPreview({
+                        title: c.title, creator: c.creator_name, avatar_color: c.avatar_color,
+                        platform: c.platform, type: c.content_type, views: c.views, engagement: c.engagement, url: c.url,
+                      })}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div className="avatar" style={{ background: c.avatar_color, width: 28, height: 28, fontSize: 11 }}>

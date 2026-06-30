@@ -22,6 +22,7 @@ export const api = {
   },
   creators: {
     list: (program_id?: number) => get<any[]>(`/creators${program_id ? `?program_id=${program_id}` : ''}`),
+    overview: (program_id?: number) => get<any[]>(`/creators/overview${program_id ? `?program_id=${program_id}` : ''}`),
     get: (id: number) => get<any>(`/creators/${id}`),
     create: (body: any) => post<any>('/creators', body),
     update: (id: number, body: any) => put<any>(`/creators/${id}`, body),
@@ -36,8 +37,6 @@ export const api = {
     updateLink: (id: number, body: any) => put<any>(`/contents/links/${id}`, body),
     review: () => get<any[]>('/contents/review'),
     updateReview: (id: number, body: any) => put<any>(`/contents/review/${id}`, body),
-    import: (body: any) => post<any>('/contents/import', body),
-    aiRefresh: (body: any) => post<any>('/contents/ai-refresh', body),
   },
   games: {
     list: () => get<any[]>('/games'),
@@ -54,6 +53,10 @@ export const api = {
     update: (id: number, body: any) => put<any>(`/rewards/${id}`, body),
   },
   analytics: {
+    dashboard: (params?: Record<string, any>) => {
+      const q = params && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
+      return get<any>(`/analytics/dashboard${q}`);
+    },
     overview: () => get<any>('/analytics/overview'),
     byPlatform: () => get<any[]>('/analytics/by-platform'),
     byProgram: () => get<any[]>('/analytics/by-program'),
@@ -83,5 +86,9 @@ export const api = {
       return get<any>(`/export/preview${q}`);
     },
     export: (body: any) => post<any>('/export', body),
+  },
+  ai: {
+    status: () => get<any>('/ai/status'),
+    refresh: (id?: number) => post<any>('/ai/refresh', id ? { id } : {}),
   },
 };

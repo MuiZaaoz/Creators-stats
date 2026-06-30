@@ -4,6 +4,7 @@ import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
 import { fmt, initials, platformColor, platformInitial, relDate } from '../lib/utils';
 import PageHeader from '../components/PageHeader';
+import { usePreviewStore } from '../store/previewStore';
 
 export default function Editor() {
   const { lang } = useAppStore();
@@ -209,12 +210,22 @@ export default function Editor() {
 
 function ReviewCard({ item, t, lang, onApprove, onReject, onEdit }: any) {
   const fields = ['views', 'engagement', 'likes', 'comments', 'shares'];
+  const openPreview = usePreviewStore((s) => s.open);
   return (
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-        <span className="platform-icon" style={{ background: platformColor(item.platform) }}>
-          {platformInitial(item.platform)}
-        </span>
+        <div onClick={() => openPreview({
+          title: item.title, creator: item.creator_name, avatar_color: item.avatar_color,
+          platform: item.platform, type: item.content_type, views: item.views, engagement: item.engagement, url: item.url,
+        })} title="ดูตัวอย่าง" style={{
+          width: 74, height: 46, borderRadius: 9, flex: 'none', cursor: 'pointer', position: 'relative',
+          background: 'linear-gradient(135deg,#1c1c24,#2d2640)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg>
+          <span className="platform-icon" style={{ position: 'absolute', bottom: -5, right: -5, background: platformColor(item.platform), border: '2px solid var(--surface)', width: 20, height: 20, fontSize: 9 }}>
+            {platformInitial(item.platform)}
+          </span>
+        </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, marginBottom: 2 }}>{item.title}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)' }}>

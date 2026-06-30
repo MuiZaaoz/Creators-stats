@@ -4,12 +4,14 @@ import { useAppStore } from '../store/appStore';
 import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
 import { fmt, initials, platformColor, platformInitial, relDate, typeColor } from '../lib/utils';
+import { usePreviewStore } from '../store/previewStore';
 
 export default function CreatorDetail() {
   const { id } = useParams();
   const { lang } = useAppStore();
   const t = useT(lang);
   const navigate = useNavigate();
+  const openPreview = usePreviewStore((s) => s.open);
   const [creator, setCreator] = useState<any>(null);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<any>({});
@@ -135,6 +137,19 @@ export default function CreatorDetail() {
         </div>
       </div>
 
+      {/* AI Data Refresh box */}
+      <div className="card" style={{ marginBottom: 20, background: 'linear-gradient(135deg, #1a1530, #1e1a3a)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent2)', animation: 'pulse 1.6s infinite' }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#c9bdff' }}>AI Data Refresh</span>
+        </div>
+        <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
+          <div><div style={{ fontSize: 11, color: 'var(--text2)' }}>Last Refresh</div><div className="num" style={{ fontWeight: 600 }}>{creator.last_refreshed ? relDate(creator.last_refreshed) : (lang === 'th' ? 'ยังไม่เคย' : 'Never')}</div></div>
+          <div><div style={{ fontSize: 11, color: 'var(--text2)' }}>Source</div><div style={{ fontWeight: 600 }}>AI Agent</div></div>
+          <div><div style={{ fontSize: 11, color: 'var(--text2)' }}>Status</div><div style={{ fontWeight: 600, color: creator.last_refreshed ? 'var(--green)' : 'var(--text2)' }}>● {creator.last_refreshed ? 'Success' : 'Idle'}</div></div>
+        </div>
+      </div>
+
       {/* Episodes */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>
@@ -150,10 +165,15 @@ export default function CreatorDetail() {
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {ep.links?.map((lnk: any) => (
-                  <div key={lnk.id} style={{
-                    background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px',
-                    display: 'flex', alignItems: 'center', gap: 10, minWidth: 200,
-                  }}>
+                  <div key={lnk.id} title="ดูตัวอย่าง"
+                    onClick={() => openPreview({
+                      title: ep.title, creator: creator.name, avatar_color: creator.avatar_color,
+                      platform: lnk.platform, type: ep.type, views: lnk.views, engagement: lnk.engagement, url: lnk.url,
+                    })}
+                    style={{
+                      background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 10, minWidth: 200,
+                    }}>
                     <span className="platform-icon" style={{ background: platformColor(lnk.platform), width: 22, height: 22, fontSize: 10 }}>
                       {platformInitial(lnk.platform)}
                     </span>
