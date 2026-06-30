@@ -23,6 +23,10 @@ creatorsRouter.get('/overview', async (req, res) => {
       (c.yt_followers + c.fb_followers + c.tt_followers + c.ig_followers) as followers,
       COALESCE(SUM(cl.views), 0) as total_views,
       COALESCE(SUM(cl.engagement), 0) as total_engagement,
+      COALESCE(SUM(cl.likes), 0) as total_likes,
+      COALESCE(SUM(cl.comments), 0) as total_comments,
+      COALESCE(SUM(cl.shares), 0) as total_shares,
+      COALESCE(SUM(cl.saves), 0) as total_saves,
       COUNT(DISTINCT e.id) as episode_count,
       MAX(e.published_at) as last_content
     FROM creators c
