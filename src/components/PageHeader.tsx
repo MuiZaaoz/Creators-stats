@@ -1,4 +1,5 @@
 import React from 'react';
+import Header from './Header';
 
 interface Props {
   title: string;
@@ -8,16 +9,13 @@ interface Props {
 
 export default function PageHeader({ title, subtitle, actions }: Props) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '20px 28px 0',
-      marginBottom: 20,
-    }}>
-      <div>
-        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</h1>
-        {subtitle && <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>{subtitle}</p>}
-      </div>
-      {actions && <div style={{ display: 'flex', gap: 8 }}>{actions}</div>}
-    </div>
+    <>
+      <Header title={title} subtitle={subtitle} />
+      {actions && (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '14px 28px 0' }}>
+          {actions}
+        </div>
+      )}
+    </>
   );
 }

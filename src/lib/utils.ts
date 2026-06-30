@@ -32,16 +32,6 @@ export function platformInitial(platform: string): string {
   return map[platform] || platform[0];
 }
 
-export function detectPlatform(url: string): string | null {
-  const u = (url || '').toLowerCase();
-  if (!u) return null;
-  if (u.includes('youtube') || u.includes('youtu.be')) return 'YouTube';
-  if (u.includes('tiktok')) return 'TikTok';
-  if (u.includes('facebook') || u.includes('fb.watch') || u.includes('fb.com')) return 'Facebook';
-  if (u.includes('instagram') || u.includes('instagr.am')) return 'Instagram';
-  return null;
-}
-
 export function typeColor(type: string): string {
   const colors: Record<string, string> = { Long: '#3b82f6', Short: '#f97316', Streamer: '#8b5cf6' };
   return colors[type] || '#888';

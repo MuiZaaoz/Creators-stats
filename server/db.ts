@@ -152,16 +152,4 @@ export async function initDb() {
       reviewed_at TEXT
     );
   `);
-
-  // Migrations: add columns that may not exist on older databases.
-  await addColumn('creators', 'last_refreshed', 'TEXT');
-  await addColumn('creators', 'prev_followers', 'INTEGER DEFAULT 0');
-}
-
-async function addColumn(table: string, column: string, type: string) {
-  try {
-    await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
-  } catch {
-    // Column already exists — ignore.
-  }
 }

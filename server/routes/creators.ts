@@ -15,32 +15,6 @@ creatorsRouter.get('/', async (req, res) => {
   res.json(await db.all(q, params));
 });
 
-// Aggregated rows for the Creator List table
-creatorsRouter.get('/overview', async (req, res) => {
-  const { program_id } = req.query;
-  let q = `
-    SELECT c.*, p.name as program_name, p.color as program_color, g.name as game_name,
-      (c.yt_followers + c.fb_followers + c.tt_followers + c.ig_followers) as followers,
-      COALESCE(SUM(cl.views), 0) as total_views,
-      COALESCE(SUM(cl.engagement), 0) as total_engagement,
-      COALESCE(SUM(cl.likes), 0) as total_likes,
-      COALESCE(SUM(cl.comments), 0) as total_comments,
-      COALESCE(SUM(cl.shares), 0) as total_shares,
-      COALESCE(SUM(cl.saves), 0) as total_saves,
-      COUNT(DISTINCT e.id) as episode_count,
-      MAX(e.published_at) as last_content
-    FROM creators c
-    LEFT JOIN programs p ON c.program_id = p.id
-    LEFT JOIN games g ON p.game_id = g.id
-    LEFT JOIN episodes e ON e.creator_id = c.id
-    LEFT JOIN content_links cl ON cl.episode_id = e.id
-  `;
-  const params: any[] = [];
-  if (program_id) { q += ' WHERE c.program_id = ?'; params.push(program_id); }
-  q += ' GROUP BY c.id ORDER BY total_views DESC';
-  res.json(await db.all(q, params));
-});
-
 creatorsRouter.get('/:id', async (req, res) => {
   const creator = await db.get(`SELECT c.*, p.name as program_name, p.color as program_color, g.name as game_name
     FROM creators c

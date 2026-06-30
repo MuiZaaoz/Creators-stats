@@ -14,7 +14,6 @@ import { analyticsRouter } from './routes/analytics.js';
 import { auditRouter } from './routes/audit.js';
 import { usersRouter } from './routes/users.js';
 import { exportRouter } from './routes/export.js';
-import { aiRouter } from './routes/ai.js';
 
 const app = express();
 app.use(cors());
@@ -29,7 +28,6 @@ app.use('/api/analytics', analyticsRouter);
 app.use('/api/audit', auditRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/export', exportRouter);
-app.use('/api/ai', aiRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
