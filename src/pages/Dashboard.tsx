@@ -9,7 +9,7 @@ import StatCard from '../components/StatCard';
 type Metric = 'views' | 'engagement' | 'likes';
 
 export default function Dashboard() {
-  const { lang } = useAppStore();
+  const { lang, openPreview } = useAppStore();
   const t = useT(lang);
   const [overview, setOverview] = useState<any>(null);
   const [programs, setPrograms] = useState<any[]>([]);
@@ -169,10 +169,14 @@ export default function Dashboard() {
                     <td style={{ textAlign: 'right' }} className="num">{fmt(c.views)}</td>
                     <td style={{ textAlign: 'right' }} className="num">{fmt(c.engagement)}</td>
                     <td style={{ textAlign: 'right' }}>
-                      <a href={c.url?.startsWith('http') ? c.url : 'https://' + c.url} target="_blank" rel="noreferrer"
-                        style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <button onClick={() => openPreview({
+                        title: c.title, creator: c.creator_name, avatar_color: c.avatar_color,
+                        platform: c.platform, type: c.content_type, views: c.views, engagement: c.engagement,
+                        likes: c.likes, comments: c.comments, url: c.url,
+                      })}
+                        style={{ background: 'transparent', color: 'var(--accent)', fontWeight: 600, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <EyeIcon /> {lang === 'th' ? 'ดูตัวอย่าง' : 'preview'}
-                      </a>
+                      </button>
                     </td>
                   </tr>
                 ))}

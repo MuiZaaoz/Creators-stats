@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { useT } from '../lib/i18n';
+import PreviewModal from './PreviewModal';
 
 const TOP = [{ key: 'dashboard', path: '/', icon: 'grid' }];
 
@@ -125,6 +126,7 @@ export default function Layout() {
       <main style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
         <Outlet />
       </main>
+      <PreviewModal />
     </div>
   );
 }
