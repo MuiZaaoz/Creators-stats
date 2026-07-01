@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { useT } from '../lib/i18n';
+import { api } from '../lib/api';
 import PageHeader from '../components/PageHeader';
 
 export default function Profile() {
@@ -71,22 +72,53 @@ export default function Profile() {
           </div>
         </div>
 
-        <div className="card" style={{ marginTop: 16 }}>
-          <div style={{ fontWeight: 700, marginBottom: 16 }}>{lang === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}</div>
-          <div className="form-group">
-            <label>{lang === 'th' ? 'รหัสผ่านเดิม' : 'Current Password'}</label>
-            <input type="password" placeholder="••••••••" />
-          </div>
-          <div className="form-group">
-            <label>{lang === 'th' ? 'รหัสผ่านใหม่' : 'New Password'}</label>
-            <input type="password" placeholder="••••••••" />
-          </div>
-          <div className="form-group">
-            <label>{lang === 'th' ? 'ยืนยันรหัสผ่าน' : 'Confirm Password'}</label>
-            <input type="password" placeholder="••••••••" />
-          </div>
-          <button className="btn btn-secondary">{lang === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}</button>
-        </div>
+        <ChangePassword lang={lang} username={form.username} />
+      </div>
+    </div>
+  );
+}
+
+function ChangePassword({ lang, username }: { lang: string; username: string }) {
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setMsg(null);
+    if (next.length < 6) { setMsg({ ok: false, text: lang === 'th' ? 'รหัสผ่านใหม่ต้องยาว 6 ตัวขึ้นไป' : 'Min 6 characters' }); return; }
+    if (next !== confirm) { setMsg({ ok: false, text: lang === 'th' ? 'รหัสผ่านยืนยันไม่ตรงกัน' : 'Passwords do not match' }); return; }
+    setBusy(true);
+    try {
+      await api.users.changePassword({ username, current_password: cur, new_password: next });
+      setMsg({ ok: true, text: lang === 'th' ? 'เปลี่ยนรหัสผ่านสำเร็จ' : 'Password changed' });
+      setCur(''); setNext(''); setConfirm('');
+    } catch (e: any) {
+      setMsg({ ok: false, text: lang === 'th' ? 'รหัสผ่านเดิมไม่ถูกต้อง หรือเกิดข้อผิดพลาด' : 'Wrong current password' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div style={{ fontWeight: 700, marginBottom: 16 }}>{lang === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}</div>
+      <div className="form-group">
+        <label>{lang === 'th' ? 'รหัสผ่านเดิม' : 'Current Password'}</label>
+        <input type="password" placeholder="••••••••" value={cur} onChange={e => setCur(e.target.value)} />
+      </div>
+      <div className="form-group">
+        <label>{lang === 'th' ? 'รหัสผ่านใหม่' : 'New Password'}</label>
+        <input type="password" placeholder="••••••••" value={next} onChange={e => setNext(e.target.value)} />
+      </div>
+      <div className="form-group">
+        <label>{lang === 'th' ? 'ยืนยันรหัสผ่าน' : 'Confirm Password'}</label>
+        <input type="password" placeholder="••••••••" value={confirm} onChange={e => setConfirm(e.target.value)} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button className="btn btn-secondary" onClick={submit} disabled={busy}>{lang === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}</button>
+        {msg && <span style={{ fontSize: 12, color: msg.ok ? 'var(--green)' : 'var(--red)' }}>{msg.ok ? '✓ ' : ''}{msg.text}</span>}
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useAppStore } from '../store/appStore';
 import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
-import { platformColor, platformInitial } from '../lib/utils';
+import { fmt, platformColor, platformInitial } from '../lib/utils';
 import PageHeader from '../components/PageHeader';
 
 const PLATFORMS = ['YouTube', 'Facebook', 'TikTok', 'Instagram'];
@@ -24,35 +25,6 @@ export default function Collect() {
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  // AI Refresh simulation
-  const [aiState, setAiState] = useState<'idle' | 'running' | 'done'>('idle');
-  const [aiCount, setAiCount] = useState(0);
-  // Upload
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploadFile, setUploadFile] = useState<string | null>(null);
-  const [uploadDone, setUploadDone] = useState(false);
-  // Web submit
-  const [copied, setCopied] = useState(false);
-
-  const runAiRefresh = () => {
-    setAiState('running'); setAiCount(0);
-    const total = creators.length || 8;
-    let n = 0;
-    const timer = setInterval(() => {
-      n += 1; setAiCount(n);
-      if (n >= total) { clearInterval(timer); setAiState('done'); }
-    }, 320);
-  };
-
-  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) { setUploadFile(f.name); setUploadDone(false); setTimeout(() => setUploadDone(true), 900); }
-  };
-
-  const copyLink = () => {
-    navigator.clipboard?.writeText('https://hub.example.com/submit/abc123')
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
-  };
 
   useEffect(() => {
     api.creators.list().then(c => {
@@ -220,78 +192,207 @@ export default function Collect() {
         </div>
       )}
 
-      {activeTab === 'upload' && (
-        <div className="card" style={{ maxWidth: 520 }}>
-          <input ref={fileRef} type="file" accept=".xlsx,.csv" style={{ display: 'none' }} onChange={onPickFile} />
-          <div onClick={() => fileRef.current?.click()} style={{
-            border: '2px dashed var(--border2)', borderRadius: 12, padding: 36,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', textAlign: 'center',
-          }}>
-            <div style={{ fontSize: 38 }}>📄</div>
-            <div style={{ fontWeight: 700 }}>{lang === 'th' ? 'อัปโหลดไฟล์ Excel / CSV' : 'Upload Excel / CSV'}</div>
-            <div style={{ color: 'var(--text3)', fontSize: 12 }}>{lang === 'th' ? 'คลิกเพื่อเลือกไฟล์ · รองรับ .xlsx และ .csv' : 'Click to choose · .xlsx and .csv'}</div>
-            <button className="btn btn-secondary btn-sm" style={{ marginTop: 4 }}>{lang === 'th' ? 'เลือกไฟล์' : 'Choose File'}</button>
+      {activeTab === 'upload' && <UploadTab lang={lang} />}
+
+      {activeTab === 'ai' && <AiRefreshTab lang={lang} />}
+
+      {activeTab === 'web' && <WebSubmitTab lang={lang} />}
+    </div>
+  );
+}
+
+// Map many possible column headers (TH/EN) to our canonical field names.
+const COLUMN_ALIASES: Record<string, string> = {
+  creator: 'creator_name', creator_name: 'creator_name', 'ครีเอเตอร์': 'creator_name', name: 'creator_name', 'ชื่อ': 'creator_name',
+  title: 'title', 'ชื่อคอนเทนต์': 'title', 'คอนเทนต์': 'title',
+  type: 'type', 'ประเภท': 'type',
+  platform: 'platform', 'แพลตฟอร์ม': 'platform',
+  url: 'url', link: 'url', 'ลิงก์': 'url',
+  views: 'views', 'วิว': 'views', view: 'views',
+  engagement: 'engagement', 'การมีส่วนร่วม': 'engagement', eng: 'engagement',
+  likes: 'likes', like: 'likes', 'ไลค์': 'likes',
+  comments: 'comments', comment: 'comments', 'คอมเมนต์': 'comments',
+  shares: 'shares', share: 'shares', 'แชร์': 'shares',
+  published_at: 'published_at', date: 'published_at', 'วันที่': 'published_at', 'วันที่เผยแพร่': 'published_at',
+};
+
+function normalizeRow(raw: Record<string, any>): any {
+  const out: any = {};
+  for (const key of Object.keys(raw)) {
+    const canon = COLUMN_ALIASES[String(key).trim().toLowerCase()] || COLUMN_ALIASES[String(key).trim()];
+    if (canon) out[canon] = raw[key];
+  }
+  return out;
+}
+
+function UploadTab({ lang }: { lang: string }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState<any[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [result, setResult] = useState<any>(null);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState('');
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(''); setResult(null); setFileName(file.name);
+    try {
+      const isCsv = /\.csv$/i.test(file.name);
+      const wb = isCsv
+        ? XLSX.read(await file.text(), { type: 'string' })   // UTF-8 text (Thai-safe)
+        : XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const normalized = json.map(normalizeRow).filter(r => r.creator_name || r.title || r.platform);
+      if (normalized.length === 0) setError('ไม่พบข้อมูลที่อ่านได้ — ตรวจสอบหัวคอลัมน์');
+      setRows(normalized);
+    } catch {
+      setError('อ่านไฟล์ไม่สำเร็จ');
+    }
+  };
+
+  const doImport = async () => {
+    setImporting(true);
+    try {
+      const r = await api.contents.import({ rows, submitted_by: 'Upload' });
+      setResult(r);
+      setRows([]);
+    } catch {
+      setError('นำเข้าไม่สำเร็จ');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const csv = 'creator,title,type,platform,url,views,engagement,likes,comments,shares,published_at\n'
+      + 'Napat Wong,สอนเล่นโปร EP.1,Long,YouTube,https://youtu.be/xxx,120000,8000,5000,300,150,2026-07-01\n';
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'import_template.csv'; a.click();
+  };
+
+  const cols = ['creator_name', 'title', 'type', 'platform', 'views', 'engagement', 'likes', 'comments', 'shares'];
+
+  return (
+    <div style={{ maxWidth: 900 }}>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ fontWeight: 700 }}>{lang === 'th' ? 'อัปโหลดไฟล์ Excel / CSV' : 'Upload Excel / CSV'}</div>
+          <button className="btn btn-ghost" onClick={downloadTemplate} style={{ fontSize: 12 }}>↓ {lang === 'th' ? 'ดาวน์โหลดเทมเพลต' : 'Template'}</button>
+        </div>
+        <div style={{ color: 'var(--text2)', fontSize: 12, marginBottom: 14 }}>
+          {lang === 'th' ? 'รองรับ .xlsx และ .csv — คอลัมน์: creator, title, type, platform, url, views, engagement, likes, comments, shares' : 'Supports .xlsx / .csv'}
+        </div>
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} style={{ display: 'none' }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn btn-secondary" onClick={() => fileRef.current?.click()}>{lang === 'th' ? 'เลือกไฟล์' : 'Choose File'}</button>
+          {fileName && <span style={{ fontSize: 13, color: 'var(--text2)' }}>{fileName} · {rows.length} {lang === 'th' ? 'แถว' : 'rows'}</span>}
+        </div>
+        {error && <div style={{ marginTop: 12, color: 'var(--red)', fontSize: 13 }}>{error}</div>}
+      </div>
+
+      {rows.length > 0 && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{lang === 'th' ? 'ตัวอย่างก่อนนำเข้า' : 'Preview'} ({rows.length})</div>
+            <button className="btn btn-primary" onClick={doImport} disabled={importing}>{importing ? '...' : (lang === 'th' ? `นำเข้า ${rows.length} รายการ` : `Import ${rows.length}`)}</button>
           </div>
-          {uploadFile && (
-            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface2)', borderRadius: 9, padding: '12px 14px' }}>
-              <span style={{ fontSize: 20 }}>{uploadDone ? '✅' : '⏳'}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{uploadFile}</div>
-                <div style={{ fontSize: 12, color: uploadDone ? 'var(--green)' : 'var(--text2)' }}>
-                  {uploadDone ? (lang === 'th' ? 'นำเข้าสำเร็จ · พร้อมตรวจสอบในหน้า Editor' : 'Imported · ready for review') : (lang === 'th' ? 'กำลังประมวลผล...' : 'Processing...')}
-                </div>
-              </div>
+          <div style={{ overflowX: 'auto', maxHeight: 360 }}>
+            <table style={{ minWidth: 700 }}>
+              <thead><tr>{cols.map(c => <th key={c}>{c}</th>)}</tr></thead>
+              <tbody>
+                {rows.slice(0, 30).map((r, i) => (
+                  <tr key={i}>{cols.map(c => <td key={c} className="num" style={{ fontSize: 12 }}>{typeof r[c] === 'number' ? fmt(r[c]) : (r[c] ?? '-')}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {result && (
+        <div className="card" style={{ borderColor: 'var(--green)' }}>
+          <div style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>✓ {lang === 'th' ? 'นำเข้าสำเร็จ' : 'Imported'}</div>
+          <div style={{ fontSize: 13 }}>{lang === 'th' ? 'นำเข้า' : 'Imported'} <b>{result.imported}</b> / {result.total} {lang === 'th' ? 'รายการ เข้าคิวตรวจสอบแล้ว' : 'rows (queued for review)'}</div>
+          {result.errors?.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>
+              {result.errors.slice(0, 5).map((e: string, i: number) => <div key={i}>{e}</div>)}
             </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
 
-      {activeTab === 'ai' && (
-        <div className="card" style={{ maxWidth: 520 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span className="tag" style={{ background: '#7c5cff1f', color: '#7c5cff' }}>AI Refresh</span>
-          </div>
-          <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
-            {lang === 'th' ? 'ใช้ AI อัปเดตข้อมูล Follower อัตโนมัติจาก handle ที่ลงทะเบียนไว้' : 'Use AI to auto-update follower counts from registered handles.'}
-          </div>
+function AiRefreshTab({ lang }: { lang: string }) {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<any>(null);
 
-          {aiState === 'running' && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 6 }}>
-                <span style={{ color: 'var(--text2)' }}>{lang === 'th' ? 'กำลังดึงข้อมูล...' : 'Fetching...'}</span>
-                <span className="num" style={{ fontWeight: 700 }}>{aiCount}/{creators.length || 8}</span>
-              </div>
-              <div style={{ height: 8, background: 'var(--surface3)', borderRadius: 5, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: (aiCount / (creators.length || 8) * 100) + '%', background: '#7c5cff', borderRadius: 5, transition: 'width 0.3s' }} />
-              </div>
-            </div>
-          )}
-          {aiState === 'done' && (
-            <div style={{ marginBottom: 16, background: 'var(--green-soft)', border: '1px solid #b6e6c5', color: 'var(--green)', borderRadius: 9, padding: '11px 14px', fontSize: 13, fontWeight: 600 }}>
-              ✓ {lang === 'th' ? `อัปเดตสำเร็จ ${creators.length || 8} ครีเอเตอร์` : `Updated ${creators.length || 8} creators`}
-            </div>
-          )}
+  const run = async () => {
+    setRunning(true); setResult(null);
+    try {
+      const r = await api.creators.refresh();
+      setResult(r);
+    } finally {
+      setRunning(false);
+    }
+  };
 
-          <button className="btn btn-primary" disabled={aiState === 'running'} onClick={runAiRefresh}>
-            {aiState === 'running' ? (lang === 'th' ? 'กำลังทำงาน...' : 'Running...') : aiState === 'done' ? (lang === 'th' ? 'รันอีกครั้ง' : 'Run again') : (lang === 'th' ? 'เริ่ม AI Refresh' : 'Start AI Refresh')}
-          </button>
+  return (
+    <div className="card" style={{ maxWidth: 520 }}>
+      <div style={{ fontWeight: 700, marginBottom: 12 }}>AI Refresh</div>
+      <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
+        {lang === 'th' ? 'ดึงยอดผู้ติดตามล่าสุดของทุกครีเอเตอร์อัตโนมัติ และบันทึกลงประวัติสำหรับคำนวณการเติบโต' : 'Re-fetch latest follower counts for all creators and record history.'}
+      </div>
+      <button className="btn btn-primary" onClick={run} disabled={running}>
+        {running ? (lang === 'th' ? 'กำลังอัปเดต...' : 'Refreshing...') : (lang === 'th' ? 'เริ่ม AI Refresh' : 'Start AI Refresh')}
+      </button>
+      {result && (
+        <div style={{ marginTop: 16, background: 'var(--surface2)', borderRadius: 8, padding: '12px 14px', fontSize: 13 }}>
+          ✓ {lang === 'th' ? 'อัปเดตแล้ว' : 'Updated'} <b>{result.updated}</b> {lang === 'th' ? 'ครีเอเตอร์' : 'creators'}
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>{new Date(result.refreshed_at).toLocaleString('th-TH')}</div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {activeTab === 'web' && (
-        <div className="card" style={{ maxWidth: 520 }}>
-          <div style={{ fontWeight: 700, marginBottom: 12 }}>Web Submit Link</div>
-          <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
-            {lang === 'th' ? 'สร้างลิงก์ให้ครีเอเตอร์กรอกข้อมูลด้วยตัวเอง' : 'Generate a link for creators to self-submit their data.'}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--mono)', fontSize: 12.5, color: 'var(--accent)' }}>
-              https://hub.example.com/submit/abc123
-            </div>
-            <button className="btn btn-secondary" onClick={copyLink}>{copied ? (lang === 'th' ? 'คัดลอกแล้ว ✓' : 'Copied ✓') : (lang === 'th' ? 'คัดลอกลิงก์' : 'Copy Link')}</button>
-          </div>
+function WebSubmitTab({ lang }: { lang: string }) {
+  const submitUrl = `${window.location.origin}/submit`;
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(submitUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard may be blocked; user can copy manually */
+    }
+  };
+
+  return (
+    <div className="card" style={{ maxWidth: 560 }}>
+      <div style={{ fontWeight: 700, marginBottom: 12 }}>Web Submit Link</div>
+      <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
+        {lang === 'th'
+          ? 'ส่งลิงก์นี้ให้ครีเอเตอร์กรอกข้อมูลคอนเทนต์ด้วยตัวเอง — ข้อมูลจะเข้าคิวตรวจสอบอัตโนมัติ'
+          : 'Share this link so creators can submit their own content. Submissions go to the review queue.'}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <div style={{ flex: 1, background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px', fontFamily: 'monospace', fontSize: 13, color: 'var(--accent2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {submitUrl}
         </div>
-      )}
+        <button className="btn btn-primary" onClick={copy}>
+          {copied ? (lang === 'th' ? '✓ คัดลอกแล้ว' : '✓ Copied') : (lang === 'th' ? 'คัดลอกลิงก์' : 'Copy Link')}
+        </button>
+      </div>
+      <a href={submitUrl} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
+        {lang === 'th' ? 'เปิดหน้าฟอร์ม ↗' : 'Open form ↗'}
+      </a>
     </div>
   );
 }

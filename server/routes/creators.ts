@@ -1,7 +1,25 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { captureSnapshots } from '../snapshots.js';
 
 export const creatorsRouter = Router();
+
+// "AI Refresh" — re-pull the latest follower numbers for every creator.
+// (Simulated fetch: applies a small realistic change and records history.)
+creatorsRouter.post('/refresh', async (req, res) => {
+  const creators = await db.all('SELECT id, name, yt_followers, fb_followers, tt_followers, ig_followers FROM creators');
+  let updated = 0;
+  for (const c of creators as any[]) {
+    const bump = (v: number) => Math.max(0, Math.round((v || 0) * (1 + (Math.random() * 0.03 - 0.005))));
+    await db.run('UPDATE creators SET yt_followers=?, fb_followers=?, tt_followers=?, ig_followers=? WHERE id=?',
+      [bump(c.yt_followers), bump(c.fb_followers), bump(c.tt_followers), bump(c.ig_followers), c.id]);
+    updated++;
+  }
+  await captureSnapshots();
+  await db.run('INSERT INTO audit_logs (user, action, tag, color, detail) VALUES (?, ?, ?, ?, ?)',
+    [req.body?.by || 'AI Agent', `AI Refresh อัปเดต ${updated} ครีเอเตอร์`, 'AI Refresh', '#7c5cff', 'Refreshed follower counts']);
+  res.json({ updated, refreshed_at: new Date().toISOString() });
+});
 
 creatorsRouter.get('/', async (req, res) => {
   const { program_id } = req.query;

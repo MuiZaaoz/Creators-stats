@@ -13,6 +13,23 @@ usersRouter.get('/roles', async (_req, res) => {
   res.json((roles as any[]).map(r => ({ ...r, permissions: JSON.parse(r.permissions || '{}') })));
 });
 
+usersRouter.post('/change-password', async (req, res) => {
+  const { username, current_password, new_password } = req.body;
+  if (!new_password || String(new_password).length < 6) {
+    return res.status(400).json({ error: 'รหัสผ่านใหม่ต้องยาวอย่างน้อย 6 ตัวอักษร' });
+  }
+  const user = await db.get('SELECT id, password_hash FROM users WHERE username = ?', [username]);
+  if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+  // Placeholder-seeded accounts ('hashed_pw') accept any current password once.
+  if (user.password_hash !== 'hashed_pw' && user.password_hash !== current_password) {
+    return res.status(400).json({ error: 'รหัสผ่านเดิมไม่ถูกต้อง' });
+  }
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [new_password, user.id]);
+  await db.run('INSERT INTO audit_logs (user, action, tag, color, detail) VALUES (?, ?, ?, ?, ?)',
+    [username, 'เปลี่ยนรหัสผ่าน', 'ระบบ', '#6b6b72', '']);
+  res.json({ ok: true });
+});
+
 usersRouter.post('/', async (req, res) => {
   const { name, username, email, role } = req.body;
   const r = await db.run('INSERT INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', [name, username, email, 'hashed_pw', role || 'Editor']);

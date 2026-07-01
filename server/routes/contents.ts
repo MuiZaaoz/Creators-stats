@@ -38,6 +38,100 @@ contentsRouter.post('/episodes', async (req, res) => {
   res.json({ id: epId });
 });
 
+// Public self-submission (no auth, no creator list exposed). The submitter
+// types their own creator name; we find-or-create it, then queue for review.
+contentsRouter.post('/submit', async (req, res) => {
+  const { creator_name, title, type, published_at, links } = req.body;
+  if (!creator_name || !String(creator_name).trim() || !title || !String(title).trim()) {
+    return res.status(400).json({ error: 'creator_name and title are required' });
+  }
+  const name = String(creator_name).trim();
+
+  let creator = await db.get('SELECT id FROM creators WHERE name = ?', [name]);
+  let creatorId: number;
+  if (creator) {
+    creatorId = creator.id;
+  } else {
+    const prog = await db.get('SELECT id FROM programs ORDER BY id LIMIT 1');
+    const palette = ['#7c5cff', '#5b5bd6', '#f97316', '#22c55e', '#06b6d4', '#ec4899', '#ef4444', '#eab308'];
+    const color = palette[Math.floor(Math.random() * palette.length)];
+    const r = await db.run('INSERT INTO creators (name, type, program_id, avatar_color) VALUES (?, ?, ?, ?)',
+      [name, type || 'Long', prog ? prog.id : null, color]);
+    creatorId = r.lastInsertRowid;
+  }
+
+  const ep = await db.run('INSERT INTO episodes (creator_id, title, type, published_at) VALUES (?, ?, ?, ?)',
+    [creatorId, title, type || 'Long', published_at]);
+  const epId = ep.lastInsertRowid;
+  for (const lnk of (links || [])) {
+    const linkRow = await db.run('INSERT INTO content_links (episode_id, platform, url, views, engagement, likes, comments, shares, saves) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [epId, lnk.platform, lnk.url || '', lnk.views || 0, lnk.engagement || 0, lnk.likes || 0, lnk.comments || 0, lnk.shares || 0, lnk.saves || 0]);
+    await db.run('INSERT INTO review_queue (content_link_id, status, submitted_by) VALUES (?, ?, ?)', [linkRow.lastInsertRowid, 'pending', name]);
+  }
+  await db.run('INSERT INTO audit_logs (user, action, tag, color, detail) VALUES (?, ?, ?, ?, ?)',
+    [name, `ส่งข้อมูลผ่าน Web Submit: ${title}`, 'Web Submit', '#7c5cff', `${(links || []).length} platforms`]);
+  res.json({ ok: true, id: epId });
+});
+
+// Bulk import from an uploaded Excel/CSV (rows already parsed on the client).
+// Each row = one content link; grouped into an episode per (creator + title).
+contentsRouter.post('/import', async (req, res) => {
+  const rows: any[] = req.body.rows || [];
+  const submittedBy = req.body.submitted_by || 'Upload';
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'No rows to import' });
+  }
+
+  const prog = await db.get('SELECT id FROM programs ORDER BY id LIMIT 1');
+  const creatorCache: Record<string, number> = {};
+  const episodeCache: Record<string, number> = {};
+  let imported = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const name = String(r.creator_name || r.creator || '').trim();
+    const title = String(r.title || '').trim();
+    const platform = String(r.platform || '').trim();
+    if (!name || !title || !platform) {
+      errors.push(`แถว ${i + 1}: ขาด creator/title/platform`);
+      continue;
+    }
+
+    // find-or-create creator
+    let creatorId = creatorCache[name];
+    if (!creatorId) {
+      const existing = await db.get('SELECT id FROM creators WHERE name = ?', [name]);
+      if (existing) creatorId = existing.id;
+      else {
+        const cr = await db.run('INSERT INTO creators (name, type, program_id, avatar_color) VALUES (?, ?, ?, ?)',
+          [name, r.type || 'Long', prog ? prog.id : null, '#7c5cff']);
+        creatorId = cr.lastInsertRowid;
+      }
+      creatorCache[name] = creatorId;
+    }
+
+    // find-or-create episode (per creator+title)
+    const epKey = creatorId + '|' + title;
+    let epId = episodeCache[epKey];
+    if (!epId) {
+      const ep = await db.run('INSERT INTO episodes (creator_id, title, type, published_at) VALUES (?, ?, ?, ?)',
+        [creatorId, title, r.type || 'Long', r.published_at || new Date().toISOString()]);
+      epId = ep.lastInsertRowid;
+      episodeCache[epKey] = epId;
+    }
+
+    const link = await db.run('INSERT INTO content_links (episode_id, platform, url, views, engagement, likes, comments, shares, saves) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [epId, platform, r.url || '', Number(r.views) || 0, Number(r.engagement) || 0, Number(r.likes) || 0, Number(r.comments) || 0, Number(r.shares) || 0, Number(r.saves) || 0]);
+    await db.run('INSERT INTO review_queue (content_link_id, status, submitted_by) VALUES (?, ?, ?)', [link.lastInsertRowid, 'pending', submittedBy]);
+    imported++;
+  }
+
+  await db.run('INSERT INTO audit_logs (user, action, tag, color, detail) VALUES (?, ?, ?, ?, ?)',
+    [submittedBy, `นำเข้าข้อมูล ${imported} รายการ`, 'Upload', '#0ea5e9', `${rows.length} rows, ${errors.length} errors`]);
+  res.json({ imported, total: rows.length, errors });
+});
+
 contentsRouter.put('/links/:id', async (req, res) => {
   const { url, views, engagement, likes, comments, shares, saves, uv, video_views } = req.body;
   await db.run('UPDATE content_links SET url=?, views=?, engagement=?, likes=?, comments=?, shares=?, saves=?, uv=?, video_views=? WHERE id=?',

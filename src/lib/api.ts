@@ -26,6 +26,7 @@ export const api = {
     create: (body: any) => post<any>('/creators', body),
     update: (id: number, body: any) => put<any>(`/creators/${id}`, body),
     delete: (id: number) => del<any>(`/creators/${id}`),
+    refresh: () => post<any>('/creators/refresh', {}),
   },
   contents: {
     list: (params?: Record<string, any>) => {
@@ -33,6 +34,8 @@ export const api = {
       return get<any[]>(`/contents${q}`);
     },
     createEpisode: (body: any) => post<any>('/contents/episodes', body),
+    submit: (body: any) => post<any>('/contents/submit', body),
+    import: (body: any) => post<any>('/contents/import', body),
     updateLink: (id: number, body: any) => put<any>(`/contents/links/${id}`, body),
     review: () => get<any[]>('/contents/review'),
     updateReview: (id: number, body: any) => put<any>(`/contents/review/${id}`, body),
@@ -53,6 +56,7 @@ export const api = {
   },
   analytics: {
     overview: () => get<any>('/analytics/overview'),
+    monthly: () => get<any[]>('/analytics/monthly'),
     byPlatform: () => get<any[]>('/analytics/by-platform'),
     byProgram: () => get<any[]>('/analytics/by-program'),
     byCreator: (program_id?: number) => get<any[]>(`/analytics/by-creator${program_id ? `?program_id=${program_id}` : ''}`),
@@ -74,6 +78,7 @@ export const api = {
     delete: (id: number) => del<any>(`/users/${id}`),
     updateRole: (id: number, body: any) => put<any>(`/users/roles/${id}`, body),
     createRole: (body: any) => post<any>('/users/roles', body),
+    changePassword: (body: any) => post<any>('/users/change-password', body),
   },
   export: {
     preview: (params?: Record<string, any>) => {
