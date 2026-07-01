@@ -5,7 +5,6 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { initDb } from './db.js';
 import { seed } from './seed.js';
-import { captureSnapshots } from './snapshots.js';
 import { programsRouter } from './routes/programs.js';
 import { creatorsRouter } from './routes/creators.js';
 import { contentsRouter } from './routes/contents.js';
@@ -54,7 +53,6 @@ async function start() {
   if (process.env.SEED_SAMPLE_DATA === 'true') {
     await seed();
   }
-  await captureSnapshots();
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 }
 

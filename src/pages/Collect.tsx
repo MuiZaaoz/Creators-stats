@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
@@ -24,6 +24,35 @@ export default function Collect() {
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  // AI Refresh simulation
+  const [aiState, setAiState] = useState<'idle' | 'running' | 'done'>('idle');
+  const [aiCount, setAiCount] = useState(0);
+  // Upload
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadFile, setUploadFile] = useState<string | null>(null);
+  const [uploadDone, setUploadDone] = useState(false);
+  // Web submit
+  const [copied, setCopied] = useState(false);
+
+  const runAiRefresh = () => {
+    setAiState('running'); setAiCount(0);
+    const total = creators.length || 8;
+    let n = 0;
+    const timer = setInterval(() => {
+      n += 1; setAiCount(n);
+      if (n >= total) { clearInterval(timer); setAiState('done'); }
+    }, 320);
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) { setUploadFile(f.name); setUploadDone(false); setTimeout(() => setUploadDone(true), 900); }
+  };
+
+  const copyLink = () => {
+    navigator.clipboard?.writeText('https://hub.example.com/submit/abc123')
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  };
 
   useEffect(() => {
     api.creators.list().then(c => {
@@ -192,66 +221,77 @@ export default function Collect() {
       )}
 
       {activeTab === 'upload' && (
-        <div className="card empty-state" style={{ maxWidth: 500 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📄</div>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>{lang === 'th' ? 'อัปโหลดไฟล์ Excel / CSV' : 'Upload Excel / CSV'}</div>
-          <div style={{ color: 'var(--text2)', fontSize: 12, marginBottom: 16 }}>
-            {lang === 'th' ? 'รองรับรูปแบบ .xlsx และ .csv' : 'Supports .xlsx and .csv formats'}
+        <div className="card" style={{ maxWidth: 520 }}>
+          <input ref={fileRef} type="file" accept=".xlsx,.csv" style={{ display: 'none' }} onChange={onPickFile} />
+          <div onClick={() => fileRef.current?.click()} style={{
+            border: '2px dashed var(--border2)', borderRadius: 12, padding: 36,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 38 }}>📄</div>
+            <div style={{ fontWeight: 700 }}>{lang === 'th' ? 'อัปโหลดไฟล์ Excel / CSV' : 'Upload Excel / CSV'}</div>
+            <div style={{ color: 'var(--text3)', fontSize: 12 }}>{lang === 'th' ? 'คลิกเพื่อเลือกไฟล์ · รองรับ .xlsx และ .csv' : 'Click to choose · .xlsx and .csv'}</div>
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: 4 }}>{lang === 'th' ? 'เลือกไฟล์' : 'Choose File'}</button>
           </div>
-          <button className="btn btn-secondary">{lang === 'th' ? 'เลือกไฟล์' : 'Choose File'}</button>
+          {uploadFile && (
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface2)', borderRadius: 9, padding: '12px 14px' }}>
+              <span style={{ fontSize: 20 }}>{uploadDone ? '✅' : '⏳'}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{uploadFile}</div>
+                <div style={{ fontSize: 12, color: uploadDone ? 'var(--green)' : 'var(--text2)' }}>
+                  {uploadDone ? (lang === 'th' ? 'นำเข้าสำเร็จ · พร้อมตรวจสอบในหน้า Editor' : 'Imported · ready for review') : (lang === 'th' ? 'กำลังประมวลผล...' : 'Processing...')}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {activeTab === 'ai' && (
-        <div className="card" style={{ maxWidth: 500 }}>
-          <div style={{ fontWeight: 700, marginBottom: 12 }}>AI Refresh</div>
+        <div className="card" style={{ maxWidth: 520 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span className="tag" style={{ background: '#7c5cff1f', color: '#7c5cff' }}>AI Refresh</span>
+          </div>
           <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
             {lang === 'th' ? 'ใช้ AI อัปเดตข้อมูล Follower อัตโนมัติจาก handle ที่ลงทะเบียนไว้' : 'Use AI to auto-update follower counts from registered handles.'}
           </div>
-          <button className="btn btn-primary">
-            {lang === 'th' ? 'เริ่ม AI Refresh' : 'Start AI Refresh'}
+
+          {aiState === 'running' && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 6 }}>
+                <span style={{ color: 'var(--text2)' }}>{lang === 'th' ? 'กำลังดึงข้อมูล...' : 'Fetching...'}</span>
+                <span className="num" style={{ fontWeight: 700 }}>{aiCount}/{creators.length || 8}</span>
+              </div>
+              <div style={{ height: 8, background: 'var(--surface3)', borderRadius: 5, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: (aiCount / (creators.length || 8) * 100) + '%', background: '#7c5cff', borderRadius: 5, transition: 'width 0.3s' }} />
+              </div>
+            </div>
+          )}
+          {aiState === 'done' && (
+            <div style={{ marginBottom: 16, background: 'var(--green-soft)', border: '1px solid #b6e6c5', color: 'var(--green)', borderRadius: 9, padding: '11px 14px', fontSize: 13, fontWeight: 600 }}>
+              ✓ {lang === 'th' ? `อัปเดตสำเร็จ ${creators.length || 8} ครีเอเตอร์` : `Updated ${creators.length || 8} creators`}
+            </div>
+          )}
+
+          <button className="btn btn-primary" disabled={aiState === 'running'} onClick={runAiRefresh}>
+            {aiState === 'running' ? (lang === 'th' ? 'กำลังทำงาน...' : 'Running...') : aiState === 'done' ? (lang === 'th' ? 'รันอีกครั้ง' : 'Run again') : (lang === 'th' ? 'เริ่ม AI Refresh' : 'Start AI Refresh')}
           </button>
         </div>
       )}
 
-      {activeTab === 'web' && <WebSubmitTab lang={lang} />}
-    </div>
-  );
-}
-
-function WebSubmitTab({ lang }: { lang: string }) {
-  const submitUrl = `${window.location.origin}/submit`;
-  const [copied, setCopied] = useState(false);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(submitUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard may be blocked; user can copy manually */
-    }
-  };
-
-  return (
-    <div className="card" style={{ maxWidth: 560 }}>
-      <div style={{ fontWeight: 700, marginBottom: 12 }}>Web Submit Link</div>
-      <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
-        {lang === 'th'
-          ? 'ส่งลิงก์นี้ให้ครีเอเตอร์กรอกข้อมูลคอนเทนต์ด้วยตัวเอง — ข้อมูลจะเข้าคิวตรวจสอบอัตโนมัติ'
-          : 'Share this link so creators can submit their own content. Submissions go to the review queue.'}
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <div style={{ flex: 1, background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px', fontFamily: 'monospace', fontSize: 13, color: 'var(--accent2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {submitUrl}
+      {activeTab === 'web' && (
+        <div className="card" style={{ maxWidth: 520 }}>
+          <div style={{ fontWeight: 700, marginBottom: 12 }}>Web Submit Link</div>
+          <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
+            {lang === 'th' ? 'สร้างลิงก์ให้ครีเอเตอร์กรอกข้อมูลด้วยตัวเอง' : 'Generate a link for creators to self-submit their data.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1, background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--mono)', fontSize: 12.5, color: 'var(--accent)' }}>
+              https://hub.example.com/submit/abc123
+            </div>
+            <button className="btn btn-secondary" onClick={copyLink}>{copied ? (lang === 'th' ? 'คัดลอกแล้ว ✓' : 'Copied ✓') : (lang === 'th' ? 'คัดลอกลิงก์' : 'Copy Link')}</button>
+          </div>
         </div>
-        <button className="btn btn-primary" onClick={copy}>
-          {copied ? (lang === 'th' ? '✓ คัดลอกแล้ว' : '✓ Copied') : (lang === 'th' ? 'คัดลอกลิงก์' : 'Copy Link')}
-        </button>
-      </div>
-      <a href={submitUrl} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
-        {lang === 'th' ? 'เปิดหน้าฟอร์ม ↗' : 'Open form ↗'}
-      </a>
+      )}
     </div>
   );
 }

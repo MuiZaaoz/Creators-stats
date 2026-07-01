@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { db } from '../db.js';
-import { growthFor } from '../snapshots.js';
 
 export const analyticsRouter = Router();
 
@@ -98,12 +97,8 @@ analyticsRouter.get('/by-type', async (_req, res) => {
 analyticsRouter.get('/comparison', async (req, res) => {
   const { mode = 'program' } = req.query;
 
-  let data: any[];
-  let scope: string;
-
   if (mode === 'creator') {
-    scope = 'creator';
-    data = await db.all(`
+    const data = await db.all(`
       SELECT c.id, c.name as label, c.avatar_color as color, c.type,
         p.name as group_name,
         SUM(cl.views) as views, SUM(cl.engagement) as engagement,
@@ -116,10 +111,12 @@ analyticsRouter.get('/comparison', async (req, res) => {
       GROUP BY c.id
       ORDER BY views DESC
     `);
-  } else if (mode === 'platform') {
-    scope = 'platform';
-    data = await db.all(`
-      SELECT cl.platform as id, cl.platform as label, cl.platform as color,
+    return res.json(data);
+  }
+
+  if (mode === 'platform') {
+    const data = await db.all(`
+      SELECT cl.platform as label, cl.platform as color,
         SUM(cl.views) as views, SUM(cl.engagement) as engagement,
         SUM(cl.likes) as likes, SUM(cl.comments) as comments,
         SUM(cl.shares) as shares, COUNT(cl.id) as episodes
@@ -127,28 +124,21 @@ analyticsRouter.get('/comparison', async (req, res) => {
       GROUP BY cl.platform
       ORDER BY views DESC
     `);
-  } else {
-    scope = 'program';
-    data = await db.all(`
-      SELECT p.id, p.name as label, p.color,
-        SUM(cl.views) as views, SUM(cl.engagement) as engagement,
-        SUM(cl.likes) as likes, SUM(cl.comments) as comments,
-        SUM(cl.shares) as shares, COUNT(DISTINCT e.id) as episodes,
-        COUNT(DISTINCT c.id) as creators
-      FROM programs p
-      LEFT JOIN creators c ON c.program_id = p.id
-      LEFT JOIN episodes e ON e.creator_id = c.id
-      LEFT JOIN content_links cl ON cl.episode_id = e.id
-      GROUP BY p.id
-      ORDER BY views DESC
-    `);
+    return res.json(data);
   }
 
-  // Attach month-over-month growth from the snapshots history.
-  for (const row of data) {
-    const ref = scope === 'platform' ? row.label : row.id;
-    row.growth = await growthFor(scope, ref, Number(row.views) || 0);
-  }
-
+  const data = await db.all(`
+    SELECT p.id, p.name as label, p.color,
+      SUM(cl.views) as views, SUM(cl.engagement) as engagement,
+      SUM(cl.likes) as likes, SUM(cl.comments) as comments,
+      SUM(cl.shares) as shares, COUNT(DISTINCT e.id) as episodes,
+      COUNT(DISTINCT c.id) as creators
+    FROM programs p
+    LEFT JOIN creators c ON c.program_id = p.id
+    LEFT JOIN episodes e ON e.creator_id = c.id
+    LEFT JOIN content_links cl ON cl.episode_id = e.id
+    GROUP BY p.id
+    ORDER BY views DESC
+  `);
   res.json(data);
 });
