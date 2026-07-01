@@ -152,17 +152,23 @@ export default function CreatorDetail() {
                 {ep.links?.map((lnk: any) => (
                   <div key={lnk.id} style={{
                     background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px',
-                    display: 'flex', alignItems: 'center', gap: 10, minWidth: 200,
+                    display: 'flex', alignItems: 'center', gap: 10, minWidth: 220,
                   }}>
                     <span className="platform-icon" style={{ background: platformColor(lnk.platform), width: 22, height: 22, fontSize: 10 }}>
                       {platformInitial(lnk.platform)}
                     </span>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <div className="num" style={{ fontWeight: 700 }}>{fmt(lnk.views)}</div>
                       <div style={{ fontSize: 11, color: 'var(--text2)' }}>
                         ❤ {fmt(lnk.likes)} · 💬 {fmt(lnk.comments)}
                         {lnk.uv > 0 && ` · UV: ${fmt(lnk.uv)}`}
                       </div>
+                      {lnk.url && (
+                        <a href={/^https?:\/\//.test(lnk.url) ? lnk.url : `https://${lnk.url}`} target="_blank" rel="noreferrer"
+                          style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 180 }}>
+                          🔗 {lnk.url}
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}

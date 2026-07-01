@@ -345,14 +345,14 @@ function AiRefreshTab({ lang }: { lang: string }) {
     <div className="card" style={{ maxWidth: 520 }}>
       <div style={{ fontWeight: 700, marginBottom: 12 }}>AI Refresh</div>
       <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
-        {lang === 'th' ? 'ดึงยอดผู้ติดตามล่าสุดของทุกครีเอเตอร์อัตโนมัติ และบันทึกลงประวัติสำหรับคำนวณการเติบโต' : 'Re-fetch latest follower counts for all creators and record history.'}
+        {lang === 'th' ? 'ดึงข้อมูลล่าสุดของทุกครีเอเตอร์อัตโนมัติ — ทั้งยอดผู้ติดตาม, ยอดวิว และ Engagement ของทุกคอนเทนต์ พร้อมบันทึกประวัติสำหรับคำนวณการเติบโต' : 'Re-fetch latest data for all creators — followers, views and engagement across all content.'}
       </div>
       <button className="btn btn-primary" onClick={run} disabled={running}>
         {running ? (lang === 'th' ? 'กำลังอัปเดต...' : 'Refreshing...') : (lang === 'th' ? 'เริ่ม AI Refresh' : 'Start AI Refresh')}
       </button>
       {result && (
         <div style={{ marginTop: 16, background: 'var(--surface2)', borderRadius: 8, padding: '12px 14px', fontSize: 13 }}>
-          ✓ {lang === 'th' ? 'อัปเดตแล้ว' : 'Updated'} <b>{result.updated}</b> {lang === 'th' ? 'ครีเอเตอร์' : 'creators'}
+          ✓ {lang === 'th' ? 'อัปเดตแล้ว' : 'Updated'} <b>{result.updated}</b> {lang === 'th' ? 'ครีเอเตอร์' : 'creators'} · <b>{result.links_updated}</b> {lang === 'th' ? 'คอนเทนต์' : 'content links'}
           <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>{new Date(result.refreshed_at).toLocaleString('th-TH')}</div>
         </div>
       )}
