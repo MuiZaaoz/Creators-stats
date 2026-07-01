@@ -47,18 +47,6 @@ const t: Record<string, Record<Lang, string>> = {
   url: { th: 'URL', en: 'URL' },
   user: { th: 'ผู้ใช้', en: 'User' },
   role: { th: 'บทบาท', en: 'Role' },
-  collectData: { th: 'รับข้อมูล', en: 'Data Collection' },
-  reviewData: { th: 'ตรวจสอบข้อมูล', en: 'Review Data' },
-  gameCategories: { th: 'หมวดหมู่เกม', en: 'Game Categories' },
-  grpManagement: { th: 'การจัดการ', en: 'Management' },
-  grpData: { th: 'ข้อมูล', en: 'Data' },
-  grpReports: { th: 'รายงาน', en: 'Reports' },
-  lastUpdated: { th: 'อัปเดตล่าสุด', en: 'Last updated' },
-  addData: { th: 'เพิ่มข้อมูล', en: 'Add Data' },
-  customize: { th: 'ปรับแต่ง', en: 'Customize' },
-  switchLanguage: { th: 'สลับภาษา', en: 'Switch language' },
-  programMgmt: { th: 'Program Management', en: 'Program Management' },
-  administrator: { th: 'Administrator', en: 'Administrator' },
 };
 
 export function useT(lang: Lang) {

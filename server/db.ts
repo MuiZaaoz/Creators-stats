@@ -151,5 +151,14 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       reviewed_at TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scope TEXT NOT NULL,
+      ref TEXT NOT NULL,
+      views INTEGER DEFAULT 0,
+      engagement INTEGER DEFAULT 0,
+      captured_on TEXT NOT NULL
+    );
   `);
 }
