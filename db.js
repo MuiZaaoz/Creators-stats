@@ -31,6 +31,7 @@ export async function initDb() {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS submissions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id TEXT,                    -- links submitted together = one content
       creator_name TEXT NOT NULL,
       platform TEXT,
       url TEXT NOT NULL,
@@ -45,4 +46,6 @@ export async function initDb() {
       scraped_at TEXT
     );
   `);
+  // migrate older DBs that predate group_id
+  try { await db.run('ALTER TABLE submissions ADD COLUMN group_id TEXT'); } catch (_) { /* already exists */ }
 }

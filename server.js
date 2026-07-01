@@ -26,29 +26,50 @@ const TEMPLATE = RAW
     "dv:this.shortLink(firstClip?firstClip.link:'—'), link:true",
     "dv:this.shortLink(it.link||(firstClip?firstClip.link:'—')), link:true"
   )
-  // persist approve/reject to the DB for real items (id starts with 's')
+  // video preview panel: use the REAL submitted link + real engagement
+  .replace(
+    "engagement:Math.round(it.new*0.08), link:(this.CONTENTS[c.id]&&this.CONTENTS[c.id][0]?this.CONTENTS[c.id][0].link:'https://example.com')",
+    "engagement:(it.metrics?it.metrics.eng:Math.round(it.new*0.08)), link:(it.link||(this.CONTENTS[c.id]&&this.CONTENTS[c.id][0]?this.CONTENTS[c.id][0].link:'https://example.com'))"
+  )
+  // persist approve/reject to the DB — single item (s) or whole group (g)
   .replace(
     "{...i,status:'approved'}:i)}))",
-    "{...i,status:'approved'}:i)})); try{if(String(id)[0]==='s')fetch('/api/review/'+String(id).slice(1),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'approved'})})}catch(_){}"
+    "{...i,status:'approved'}:i)})); try{var _p=String(id)[0];if(_p==='s')fetch('/api/review/'+String(id).slice(1),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'approved'})});else if(_p==='g')fetch('/api/review/group/'+String(id).slice(1),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'approved'})})}catch(_){}"
   )
   .replace(
     "{...i,status:'draft'}:i)}))",
-    "{...i,status:'draft'}:i)})); try{if(String(id)[0]==='s')fetch('/api/review/'+String(id).slice(1),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'rejected'})})}catch(_){}"
+    "{...i,status:'draft'}:i)})); try{var _p=String(id)[0];if(_p==='s')fetch('/api/review/'+String(id).slice(1),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'rejected'})});else if(_p==='g')fetch('/api/review/group/'+String(id).slice(1),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'rejected'})})}catch(_){}"
   );
 
 const PLATCOLOR = { YouTube: '#ff0000', TikTok: '#111111', Facebook: '#1877f2', Instagram: '#e1306c' };
-function toReviewItem(s) {
+
+// One content group (submitted together) → one review card with totals across platforms.
+function toGroupItem(links) {
+  const primary = links.reduce((a, b) => ((Number(b.views) || 0) > (Number(a.views) || 0) ? b : a), links[0]);
+  const sum = (k) => links.reduce((n, l) => n + (Number(l[k]) || 0), 0);
+  const gid = links[0].group_id;
+  const multi = links.length > 1;
   return {
-    id: 's' + s.id, creator: s.creator_name, color: PLATCOLOR[s.platform] || '#7c5cff',
-    platform: s.platform || 'YouTube', field: 'Web Submit', old: 0, new: Number(s.views) || 0,
-    source: 'Web Submit · Link Scrape', time: String(s.created_at || '').slice(0, 16), status: 'review',
-    link: s.url || '',
-    metrics: { eng: Number(s.engagement) || 0, like: Number(s.likes) || 0, comment: Number(s.comments) || 0, share: Number(s.shares) || 0, save: 0 },
+    id: gid ? 'g' + gid : 's' + links[0].id,
+    creator: links[0].creator_name,
+    color: PLATCOLOR[primary.platform] || '#7c5cff',
+    platform: primary.platform || 'YouTube',
+    field: multi ? 'Web Submit (' + links.length + ' แพลตฟอร์ม)' : 'Web Submit',
+    old: 0, new: sum('views'),
+    source: 'Web Submit · Link Scrape', time: String(links[0].created_at || '').slice(0, 16), status: 'review',
+    link: primary.url || '',
+    metrics: { eng: sum('engagement'), like: sum('likes'), comment: sum('comments'), share: sum('shares'), save: 0 },
   };
 }
 async function renderIndex() {
-  const pending = await db.all("SELECT * FROM submissions WHERE status IN ('scraped','failed') ORDER BY created_at DESC LIMIT 50");
-  const inner = pending.map((s) => JSON.stringify(toReviewItem(s))).join(',');
+  const rows = await db.all("SELECT * FROM submissions WHERE status IN ('scraped','failed') ORDER BY created_at DESC LIMIT 100");
+  const groups = new Map();
+  for (const r of rows) {
+    const key = r.group_id || 's' + r.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const inner = [...groups.values()].map((links) => JSON.stringify(toGroupItem(links))).join(',');
   return TEMPLATE.replace('reviewItems: [', 'reviewItems: [' + (inner ? inner + ',' : ''));
 }
 app.get(['/', '/index.html'], async (_req, res) => { res.type('html').send(await renderIndex()); });
@@ -60,13 +81,15 @@ app.post('/api/submit', async (req, res) => {
     return res.status(400).json({ error: 'ต้องมีชื่อครีเอเตอร์และลิงก์อย่างน้อย 1 รายการ' });
   }
   const ids = [];
+  // one submit (possibly many platform links) = ONE content group
+  const groupId = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   for (const l of links) {
     const url = String(l.url || '').trim();
     if (!url) continue;
     const platform = detectPlatform(url);
     const r = await db.run(
-      'INSERT INTO submissions (creator_name, platform, url, status) VALUES (?, ?, ?, ?)',
-      [creator_name.trim(), platform, url, 'scraping']
+      'INSERT INTO submissions (group_id, creator_name, platform, url, status) VALUES (?, ?, ?, ?, ?)',
+      [groupId, creator_name.trim(), platform, url, 'scraping']
     );
     const id = r.lastInsertRowid;
     ids.push(id);
@@ -101,6 +124,13 @@ app.put('/api/review/:id', async (req, res) => {
   const eng = (Number(li) || 0) + (Number(co) || 0) + (Number(sh) || 0);
   await db.run('UPDATE submissions SET status=?, views=?, likes=?, comments=?, shares=?, engagement=? WHERE id=?',
     [status || cur.status, v, li, co, sh, eng, req.params.id]);
+  res.json({ ok: true });
+});
+
+// --- API: approve/reject a whole content group (all its platform links) ---
+app.put('/api/review/group/:gid', async (req, res) => {
+  const { status } = req.body || {};
+  await db.run('UPDATE submissions SET status=? WHERE group_id=?', [status || 'approved', req.params.gid]);
   res.json({ ok: true });
 });
 
