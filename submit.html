@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CreatorHub — ส่งข้อมูลคอนเทนต์</title>
+<style>
+  :root{ --bg:#f6f6f7; --card:#fff; --border:#e5e5ea; --text:#1c1c1f; --muted:#6b6b72; --accent:#7c5cff; --soft:#f3f3f5; --green:#16a34a; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);padding:32px 16px;line-height:1.5}
+  .wrap{max-width:640px;margin:0 auto}
+  .head{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+  .logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#7c5cff,#5b5bd6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px}
+  input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;outline:none}
+  input:focus{border-color:var(--accent)}
+  .row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+  .plat{width:44px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;background:#999}
+  .btn{padding:11px 22px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn-primary{background:linear-gradient(135deg,#7c5cff,#5b5bd6);color:#fff}
+  .btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text)}
+  .btn:disabled{opacity:.6}
+  .muted{color:var(--muted);font-size:13px}
+  .result{background:var(--soft);border-radius:8px;padding:12px;margin-bottom:8px;font-size:13px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  h1{font-size:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="logo">C</div>
+    <div><h1>CreatorHub</h1><div class="muted">ส่งข้อมูลคอนเทนต์ / Submit your content</div></div>
+  </div>
+
+  <div id="form">
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:14px">ข้อมูลครีเอเตอร์</div>
+      <label>ชื่อครีเอเตอร์ *</label>
+      <input id="creator" placeholder="กรอกชื่อของคุณ" />
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-weight:700">ลิงก์คอนเทนต์</div>
+        <button class="btn btn-ghost" style="font-size:12px;padding:7px 12px" onclick="addRow()">+ เพิ่มลิงก์</button>
+      </div>
+      <div class="muted" style="margin-bottom:12px">วางลิงก์ YouTube / Facebook / TikTok / Instagram — ระบบจะเข้าไปตรวจจับยอดวิว &amp; Engagement ให้อัตโนมัติ</div>
+      <div id="rows"></div>
+    </div>
+    <button class="btn btn-primary" id="submitBtn" onclick="submitData()">ส่งข้อมูล &amp; ตรวจจับ</button>
+  </div>
+
+  <div id="detecting" style="display:none">
+    <div class="card" style="text-align:center;padding:36px">
+      <div style="font-size:36px;margin-bottom:10px">🔎</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:6px">กำลังตรวจจับข้อมูล...</div>
+      <div class="muted" id="detMsg">ระบบกำลังเข้าไปตามลิงก์เพื่ออ่านยอดวิว/Engagement (อาจใช้เวลาสักครู่)</div>
+      <div id="detResults" style="margin-top:16px;text-align:left"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PLAT = { YouTube:['YT','#ff0000'], TikTok:['TT','#111'], Facebook:['FB','#1877f2'], Instagram:['IG','#e1306c'] };
+function detect(u){ if(/youtu\.?be|youtube\.com/i.test(u))return'YouTube'; if(/tiktok\.com/i.test(u))return'TikTok'; if(/facebook\.com|fb\.watch/i.test(u))return'Facebook'; if(/instagram\.com/i.test(u))return'Instagram'; return null; }
+function addRow(url=''){
+  const d=document.createElement('div'); d.className='row';
+  d.innerHTML='<div class="plat">?</div><input placeholder="วางลิงก์คอนเทนต์..." value="'+url+'" oninput="tag(this)"/><button class="btn btn-ghost" style="padding:8px 10px" onclick="this.parentElement.remove()">✕</button>';
+  document.getElementById('rows').appendChild(d); tag(d.querySelector('input'));
+}
+function tag(inp){ const p=detect(inp.value); const chip=inp.parentElement.querySelector('.plat');
+  if(p){ chip.textContent=PLAT[p][0]; chip.style.background=PLAT[p][1]; } else { chip.textContent='?'; chip.style.background='#999'; } }
+addRow();
+
+async function submitData(){
+  const creator=document.getElementById('creator').value.trim();
+  const links=[...document.querySelectorAll('#rows input')].map(i=>i.value.trim()).filter(Boolean).map(url=>({url}));
+  if(!creator||!links.length){ alert('กรุณากรอกชื่อและลิงก์อย่างน้อย 1 รายการ'); return; }
+  document.getElementById('submitBtn').disabled=true;
+  const r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({creator_name:creator,links})});
+  const j=await r.json();
+  if(!j.ok){ alert(j.error||'ส่งไม่สำเร็จ'); document.getElementById('submitBtn').disabled=false; return; }
+  document.getElementById('form').style.display='none';
+  document.getElementById('detecting').style.display='block';
+  poll(j.ids);
+}
+
+async function poll(ids){
+  const box=document.getElementById('detResults');
+  for(let t=0;t<20;t++){
+    await new Promise(r=>setTimeout(r,5000));
+    const r=await fetch('/api/status?ids='+ids.join(','));
+    const rows=await r.json();
+    box.innerHTML=rows.map(x=>{
+      const done=x.status==='scraped', fail=x.status==='failed';
+      const c=done?'#16a34a':fail?'#ef4444':'#f59e0b';
+      const s=done?('วิว '+ (x.views||0).toLocaleString()+' · Eng '+(x.engagement||0).toLocaleString()):(fail?'ตรวจจับไม่สำเร็จ → เข้าคิวกรอกมือ':'กำลังตรวจจับ...');
+      return '<div class="result"><span class="badge" style="background:'+c+'22;color:'+c+'">'+(x.platform||'?')+'</span> '+s+'</div>';
+    }).join('');
+    if(rows.every(x=>x.status==='scraped'||x.status==='failed')){ document.getElementById('detMsg').textContent='เสร็จแล้ว — ข้อมูลเข้าคิวตรวจสอบเรียบร้อย ✅'; break; }
+  }
+}
+</script>
+</body>
+</html>

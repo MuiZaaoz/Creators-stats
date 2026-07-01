@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CreatorHub — ตรวจสอบข้อมูลที่ scrape</title>
+<style>
+  :root{ --bg:#f6f6f7; --card:#fff; --border:#e5e5ea; --text:#1c1c1f; --muted:#6b6b72; --accent:#7c5cff; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);padding:28px}
+  h1{font-size:20px;margin-bottom:4px}
+  .muted{color:var(--muted);font-size:13px}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:18px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border)}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px}
+  .badge{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  .num{font-variant-numeric:tabular-nums;text-align:right}
+  button{border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+  .ap{background:#eafaf0;color:#16a34a} .rj{background:#fdecec;color:#dc2626}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+  <h1>ตรวจสอบข้อมูล (Scrape Results)</h1>
+  <div class="muted">ข้อมูลที่ครีเอเตอร์ส่งผ่าน /submit → ระบบ scrape ยอดวิว/Engagement มาให้ตรวจก่อนอนุมัติ</div>
+  <table id="tbl"><thead><tr>
+    <th>Creator</th><th>Platform</th><th>Link</th><th class="num">Views</th><th class="num">Likes</th><th class="num">Comments</th><th class="num">Shares</th><th class="num">Engagement</th><th>สถานะ</th><th></th>
+  </tr></thead><tbody id="body"></tbody></table>
+
+<script>
+const C={scraping:'#f59e0b',scraped:'#0ea5e9',failed:'#ef4444',approved:'#16a34a',rejected:'#dc2626'};
+const fmt=n=>(Number(n)||0).toLocaleString();
+async function load(){
+  const rows=await (await fetch('/api/review')).json();
+  document.getElementById('body').innerHTML=rows.map(r=>{
+    const url=/^https?:/.test(r.url)?r.url:'https://'+r.url;
+    return `<tr>
+      <td>${r.creator_name}</td>
+      <td>${r.platform||'?'}</td>
+      <td><a href="${url}" target="_blank">ลิงก์ ↗</a></td>
+      <td class="num">${fmt(r.views)}</td><td class="num">${fmt(r.likes)}</td>
+      <td class="num">${fmt(r.comments)}</td><td class="num">${fmt(r.shares)}</td>
+      <td class="num"><b>${fmt(r.engagement)}</b></td>
+      <td><span class="badge" style="background:${C[r.status]}22;color:${C[r.status]}">${r.status}</span></td>
+      <td>${r.status==='scraped'?`<button class="ap" onclick="act(${r.id},'approved')">อนุมัติ</button> <button class="rj" onclick="act(${r.id},'rejected')">ตีกลับ</button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+async function act(id,status){ await fetch('/api/review/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})}); load(); }
+load(); setInterval(load,8000);
+</script>
+</body>
+</html>

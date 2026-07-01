@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: creators-stats
+    runtime: docker
+    plan: free
+    envVars:
+      # Reuse your existing Turso database for persistence (optional but recommended).
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
