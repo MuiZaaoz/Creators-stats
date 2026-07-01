@@ -3,13 +3,8 @@ services:
     name: creators-stats
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    buildCommand: "echo no build step"
+    startCommand: node server.js
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # Persistent database (Turso). Fill these in the Render dashboard.
-      - key: TURSO_DATABASE_URL
-        sync: false
-      - key: TURSO_AUTH_TOKEN
-        sync: false
