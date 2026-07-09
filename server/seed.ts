@@ -1,142 +1,164 @@
 import { db } from './db.js';
 
+// Real dataset ported from the original Claude Design prototype (Creator Platform.dc.html)
+
+const GAMES = ['RoV (Arena of Valor)', 'Free Fire', 'PUBG Mobile', 'Valorant', 'Genshin Impact', 'Mobile Legends'];
+
+const PROGRAMS = [
+  { key: 'star', name: 'Star Player', game: 'RoV (Arena of Valor)', color: '#f97316', types: '["Long","Short"]' },
+  { key: 'incubation', name: 'Creator Incubation', game: 'Free Fire', color: '#06b6d4', types: '["Long","Short"]' },
+  { key: 'proclinic', name: 'Pro Clinic', game: 'PUBG Mobile', color: '#8b5cf6', types: '["Long","Short","Streamer"]' },
+  { key: 'golden', name: 'Golden Space Gods', game: 'Valorant', color: '#ec4899', types: '["Long","Short","Streamer"]' },
+];
+
+// CREATORS array from the prototype (followers, total views/engagement, uv/videoViews for streamers)
+const CREATORS = [
+  { name: 'Napat Wong',  nick: 'Beam',  prog: 'star',       color: '#f97316', fb: 125000, yt: 89000,  tt: 340000, ig: 56000,  views: 4200000, eng: 312000, content: 48 },
+  { name: 'Suchada Pim', nick: 'Pim',   prog: 'incubation', color: '#06b6d4', fb: 45000,  yt: 210000, tt: 98000,  ig: 120000, views: 2800000, eng: 198000, content: 36 },
+  { name: 'Kittipong R.', nick: 'Kong', prog: 'proclinic',  color: '#8b5cf6', fb: 78000,  yt: 34000,  tt: 512000, ig: 41000,  views: 6100000, eng: 540000, content: 72 },
+  { name: 'Arisa Tan',   nick: 'Mind',  prog: 'golden',     color: '#ec4899', fb: 230000, yt: 156000, tt: 220000, ig: 310000, views: 5400000, eng: 420000, content: 55, uv: 2100000, videoViews: 3300000 },
+  { name: 'Thanawat S.', nick: 'Tee',   prog: 'star',       color: '#10b981', fb: 12000,  yt: 420000, tt: 67000,  ig: 23000,  views: 3100000, eng: 150000, content: 41 },
+  { name: 'Pichaya L.',  nick: 'Fah',   prog: 'incubation', color: '#eab308', fb: 56000,  yt: 18000,  tt: 145000, ig: 89000,  views: 1500000, eng: 96000,  content: 22 },
+  { name: 'Worawit M.',  nick: 'Earth', prog: 'proclinic',  color: '#ef4444', fb: 98000,  yt: 76000,  tt: 410000, ig: 52000,  views: 4800000, eng: 388000, content: 63, uv: 1800000, videoViews: 3000000 },
+  { name: 'Nattaya K.',  nick: 'Ploy',  prog: 'golden',     color: '#3b82f6', fb: 340000, yt: 92000,  tt: 180000, ig: 420000, views: 5900000, eng: 510000, content: 58 },
+];
+
+// Rewards per creator, same order as CREATORS (from the prototype's export report)
+const REWARDS = [446, 118, 500, 500, 350, 199, 500, 350];
+
+// buildEpisodes() ported from the prototype — deterministic, reproduces the same numbers
+const EP_TITLES = {
+  long:  ['สอนเล่นโปร', 'รีวิวอุปกรณ์', 'Live ตอบคำถาม', 'ไฮไลต์ทัวร์', 'วิเคราะห์เมตา', 'สัมภาษณ์แชมป์'],
+  short: ['โมเมนต์เด็ด', 'ท่าไม้ตาย 15 วิ', 'รีแอคชั่นสุดมันส์', 'ทิปสั้นๆ', 'โมเมนต์ฮา', 'ไฮไลต์ 1 นาที'],
+};
+const EP_DATES = ['2026-06-14T18:30:00', '2026-06-12T20:15:00', '2026-06-10T12:45:00', '2026-06-08T19:00:00', '2026-06-05T21:30:00', '2026-06-03T17:20:00', '2026-06-01T14:10:00'];
+const PSET = [
+  ['TikTok', 'YouTube', 'Facebook'],
+  ['TikTok', 'Instagram'],
+  ['YouTube', 'Facebook'],
+  ['TikTok', 'YouTube', 'Facebook', 'Instagram'],
+  ['Facebook', 'Instagram'],
+  ['TikTok'],
+  ['YouTube'],
+];
+
+function makeLink(platform: string, nick: string, i: number): string {
+  const n = nick.toLowerCase();
+  if (platform === 'TikTok') return 'https://www.tiktok.com/@' + n + '/video/74' + (1000000 + i * 137);
+  if (platform === 'YouTube') return 'https://youtu.be/' + n.slice(0, 3) + (100 + i * 7);
+  if (platform === 'Facebook') return 'https://www.facebook.com/' + n + '/videos/' + (900000 + i * 311);
+  return 'https://www.instagram.com/reel/C' + n.slice(0, 2).toUpperCase() + (10 + i);
+}
+
 export async function seed() {
   const row = await db.get('SELECT COUNT(*) as n FROM creators');
   if (row && Number(row.n) > 0) return; // Already seeded
 
   // Games
-  const games = ['RoV (Arena of Valor)', 'Free Fire', 'PUBG Mobile', 'Valorant', 'Minecraft', 'Genshin Impact'];
   const gameIds: Record<string, number> = {};
-  for (const g of games) {
+  for (const g of GAMES) {
     const r = await db.run('INSERT OR IGNORE INTO games (name) VALUES (?)', [g]);
     gameIds[g] = r.lastInsertRowid || (await db.get('SELECT id FROM games WHERE name=?', [g])).id;
   }
 
-  // Roles
-  const defaultRoles = [
-    { name: 'Admin', is_default: 1, permissions: JSON.stringify({ dashboard: 'admin', creators: 'admin', programs: 'admin', collect: 'admin', editor: 'admin', analytics: 'admin', export: 'admin', games: 'admin', rewards: 'admin', settings: 'admin' }) },
-    { name: 'Manager', is_default: 1, permissions: JSON.stringify({ dashboard: 'edit', creators: 'edit', programs: 'edit', collect: 'edit', editor: 'edit', analytics: 'view', export: 'edit', games: 'view', rewards: 'view', settings: 'off' }) },
-    { name: 'Editor', is_default: 1, permissions: JSON.stringify({ dashboard: 'view', creators: 'view', programs: 'view', collect: 'edit', editor: 'edit', analytics: 'view', export: 'view', games: 'view', rewards: 'off', settings: 'off' }) },
-    { name: 'Viewer', is_default: 1, permissions: JSON.stringify({ dashboard: 'view', creators: 'view', programs: 'view', collect: 'off', editor: 'off', analytics: 'view', export: 'view', games: 'view', rewards: 'off', settings: 'off' }) },
+  // Roles (perms from the prototype's roleDefs; 'none' mapped to 'off')
+  const roles = [
+    { name: 'Admin',   perms: { dashboard: 'admin', creators: 'admin', programs: 'admin', games: 'admin', collect: 'admin', editor: 'admin', analytics: 'admin', export: 'admin', rewards: 'admin', settings: 'admin' } },
+    { name: 'Manager', perms: { dashboard: 'view', creators: 'edit', programs: 'edit', games: 'edit', collect: 'view', editor: 'admin', analytics: 'view', export: 'edit', rewards: 'view', settings: 'off' } },
+    { name: 'Editor',  perms: { dashboard: 'view', creators: 'edit', programs: 'view', games: 'edit', collect: 'edit', editor: 'edit', analytics: 'view', export: 'view', rewards: 'off', settings: 'off' } },
+    { name: 'Viewer',  perms: { dashboard: 'view', creators: 'view', programs: 'view', games: 'view', collect: 'off', editor: 'off', analytics: 'view', export: 'off', rewards: 'off', settings: 'off' } },
   ];
-  for (const r of defaultRoles) {
-    await db.run('INSERT OR IGNORE INTO roles (name, is_default, permissions) VALUES (?, ?, ?)', [r.name, r.is_default, r.permissions]);
+  for (const r of roles) {
+    await db.run('INSERT OR IGNORE INTO roles (name, is_default, permissions) VALUES (?, 1, ?)', [r.name, JSON.stringify(r.perms)]);
   }
 
   // Programs
-  const programData = [
-    { name: 'Star Player', game: 'RoV (Arena of Valor)', color: '#f97316', types: '["Long","Short"]' },
-    { name: 'Creator Incubation', game: 'Free Fire', color: '#22c55e', types: '["Long","Short","Streamer"]' },
-    { name: 'Pro Clinic', game: 'PUBG Mobile', color: '#8b5cf6', types: '["Long","Streamer"]' },
-    { name: 'Golden Space Gods', game: 'Valorant', color: '#ec4899', types: '["Short","Streamer"]' },
-  ];
   const progIds: Record<string, number> = {};
-  for (const p of programData) {
+  for (const p of PROGRAMS) {
     const r = await db.run('INSERT INTO programs (name, game_id, color, types) VALUES (?, ?, ?, ?)', [p.name, gameIds[p.game], p.color, p.types]);
-    progIds[p.name] = r.lastInsertRowid;
+    progIds[p.key] = r.lastInsertRowid;
   }
 
-  // Creators
-  const creatorData = [
-    { name: 'Napat Wong', type: 'Short', program: 'Star Player', color: '#f97316', tt: 'beam100', yt: 'bea100', fb: 'beam', ig: 'beam_ig', tt_f: 820000, yt_f: 650000, fb_f: 430000, ig_f: 290000 },
-    { name: 'Thanawat S.', type: 'Long', program: 'Star Player', color: '#3b82f6', tt: 'tee100', yt: 'tee100', fb: 'tee', ig: 'tee_ig', tt_f: 610000, yt_f: 490000, fb_f: 320000, ig_f: 180000 },
-    { name: 'Suchada Pim', type: 'Short', program: 'Creator Incubation', color: '#8b5cf6', tt: 'pim100', yt: 'pim100', fb: 'pimz', ig: 'pim_ig', tt_f: 920000, yt_f: 720000, fb_f: 480000, ig_f: 350000 },
-    { name: 'Pichaya L.', type: 'Long', program: 'Creator Incubation', color: '#eab308', tt: 'fern100', yt: 'fern100', fb: 'fern', ig: 'fern_ig', tt_f: 530000, yt_f: 420000, fb_f: 280000, ig_f: 160000 },
-    { name: 'Kittipong R.', type: 'Streamer', program: 'Pro Clinic', color: '#06b6d4', tt: 'kit100', yt: 'kit100', fb: 'kit', ig: 'kit_ig', tt_f: 1100000, yt_f: 890000, fb_f: 600000, ig_f: 410000 },
-    { name: 'Worawit M.', type: 'Long', program: 'Pro Clinic', color: '#ef4444', tt: 'wor100', yt: 'wor100', fb: 'wor', ig: 'wor_ig', tt_f: 740000, yt_f: 580000, fb_f: 390000, ig_f: 220000 },
-    { name: 'Arisa Tan', type: 'Short', program: 'Golden Space Gods', color: '#10b981', tt: 'arisa100', yt: 'arisa100', fb: 'arisa', ig: 'arisa_ig', tt_f: 980000, yt_f: 760000, fb_f: 510000, ig_f: 380000 },
-    { name: 'Nattaya K.', type: 'Streamer', program: 'Golden Space Gods', color: '#f43f5e', tt: 'natt100', yt: 'natt100', fb: 'natt', ig: 'natt_ig', tt_f: 1050000, yt_f: 830000, fb_f: 560000, ig_f: 420000 },
-  ];
-  const creatorIds: Record<string, number> = {};
-  for (const c of creatorData) {
-    const r = await db.run(`INSERT INTO creators (name, type, program_id, avatar_color, youtube_handle, facebook_handle, tiktok_handle, instagram_handle, yt_followers, fb_followers, tt_followers, ig_followers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [c.name, c.type, progIds[c.program], c.color, c.yt, c.fb, c.tt, c.ig, c.yt_f, c.fb_f, c.tt_f, c.ig_f]);
-    creatorIds[c.name] = r.lastInsertRowid;
+  // Creators — streamers are the ones with uv/videoViews in the prototype
+  const creatorIds: number[] = [];
+  for (const c of CREATORS) {
+    const type = c.uv ? 'Streamer' : (c.tt >= c.yt && c.tt >= c.fb ? 'Short' : 'Long');
+    const n = c.nick.toLowerCase();
+    const r = await db.run(
+      `INSERT INTO creators (name, type, program_id, avatar_color, youtube_handle, facebook_handle, tiktok_handle, instagram_handle, yt_followers, fb_followers, tt_followers, ig_followers)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [c.name, type, progIds[c.prog], c.color, n, n, n, n + '_ig', c.yt, c.fb, c.tt, c.ig]
+    );
+    creatorIds.push(r.lastInsertRowid);
   }
 
-  // Episodes & Content Links
-  const episodes = [
-    { creator: 'Napat Wong', title: 'สอนเล่นโปร EP.1', type: 'Long', date: '2026-06-14T18:30:00', platforms: [
-      { p: 'TikTok', url: 'tiktok.com/@beam/v/1', v: 469863, e: 34904, l: 21000, c: 8900, s: 4500, sv: 500 },
-      { p: 'YouTube', url: 'youtu.be/bea100', v: 335616, e: 24932, l: 15000, c: 6200, s: 3200, sv: 532 },
-      { p: 'Facebook', url: 'facebook.com/beam/1', v: 201370, e: 14959, l: 9000, c: 3700, s: 2000, sv: 259 },
-    ]},
-    { creator: 'Napat Wong', title: 'ทำไม้ตาย 15 ท่า EP.2', type: 'Short', date: '2026-06-12T20:15:00', platforms: [
-      { p: 'TikTok', url: 'tiktok.com/@beam/v/2', v: 575343, e: 42000, l: 28000, c: 10000, s: 3500, sv: 500 },
-      { p: 'Instagram', url: 'instagram.com/reel/1', v: 345206, e: 25000, l: 16000, c: 6000, s: 2800, sv: 200 },
-    ]},
-    { creator: 'Thanawat S.', title: 'สอนเล่นโปร EP.1', type: 'Long', date: '2026-06-14T18:30:00', platforms: [
-      { p: 'TikTok', url: 'tiktok.com/@tee/v/1', v: 346804, e: 16781, l: 10000, c: 4200, s: 2100, sv: 481 },
-      { p: 'YouTube', url: 'youtu.be/tee100', v: 247717, e: 11986, l: 7500, c: 3000, s: 1200, sv: 286 },
-      { p: 'Facebook', url: 'facebook.com/tee/1', v: 148630, e: 7192, l: 4500, c: 1800, s: 700, sv: 192 },
-    ]},
-    { creator: 'Suchada Pim', title: 'Free Fire Ranked EP.1', type: 'Long', date: '2026-06-13T19:00:00', platforms: [
-      { p: 'TikTok', url: 'tiktok.com/@pim/v/1', v: 612000, e: 45000, l: 28000, c: 11000, s: 5500, sv: 500 },
-      { p: 'YouTube', url: 'youtu.be/pim100', v: 438000, e: 32000, l: 20000, c: 8000, s: 3800, sv: 200 },
-    ]},
-    { creator: 'Kittipong R.', title: 'PUBG Pro Match Stream', type: 'Streamer', date: '2026-06-11T21:00:00', platforms: [
-      { p: 'YouTube', url: 'youtu.be/kit100_live', v: 1150000, e: 93000, l: 58000, c: 22000, s: 10000, sv: 3000, uv: 420000, video_views: 730000 },
-      { p: 'Facebook', url: 'facebook.com/kit/live1', v: 821000, e: 66000, l: 41000, c: 16000, s: 8000, sv: 1000, uv: 310000, video_views: 511000 },
-    ]},
-    { creator: 'Arisa Tan', title: 'Valorant Highlights EP.1', type: 'Short', date: '2026-06-15T17:30:00', platforms: [
-      { p: 'TikTok', url: 'tiktok.com/@arisa/v/1', v: 890000, e: 71200, l: 44000, c: 17000, s: 9000, sv: 1200 },
-      { p: 'Instagram', url: 'instagram.com/reel/arisa1', v: 640000, e: 51000, l: 32000, c: 12000, s: 6500, sv: 500 },
-    ]},
-    { creator: 'Nattaya K.', title: 'Golden Cup Stream', type: 'Streamer', date: '2026-06-10T20:00:00', platforms: [
-      { p: 'YouTube', url: 'youtu.be/natt100_live', v: 1050000, e: 85000, l: 53000, c: 20000, s: 9500, sv: 2500, uv: 380000, video_views: 670000 },
-      { p: 'TikTok', url: 'tiktok.com/@natt/live1', v: 780000, e: 62000, l: 39000, c: 15000, s: 7500, sv: 500, uv: 290000, video_views: 490000 },
-    ]},
-    { creator: 'Worawit M.', title: 'Pro Tips PUBG EP.1', type: 'Long', date: '2026-06-12T19:00:00', platforms: [
-      { p: 'YouTube', url: 'youtu.be/wor100', v: 520000, e: 38000, l: 24000, c: 9000, s: 4500, sv: 500 },
-      { p: 'TikTok', url: 'tiktok.com/@wor/v/1', v: 380000, e: 28000, l: 17000, c: 7000, s: 3500, sv: 500 },
-      { p: 'Facebook', url: 'facebook.com/wor/1', v: 220000, e: 16000, l: 10000, c: 4000, s: 2000, sv: 200 },
-    ]},
-    { creator: 'Pichaya L.', title: 'Free Fire Guide EP.1', type: 'Long', date: '2026-06-09T18:00:00', platforms: [
-      { p: 'YouTube', url: 'youtu.be/fern100', v: 290000, e: 21000, l: 13000, c: 5000, s: 2500, sv: 500 },
-      { p: 'TikTok', url: 'tiktok.com/@fern/v/1', v: 210000, e: 15000, l: 9500, c: 3700, s: 1500, sv: 300 },
-    ]},
-  ];
+  // Episodes & content links — port of the prototype's buildEpisodes()
+  for (let ci = 0; ci < CREATORS.length; ci++) {
+    const c = CREATORS[ci];
+    const cid = creatorIds[ci];
+    const n = Math.max(3, Math.min(c.content, 7));
+    const w: number[] = [];
+    for (let i = 0; i < n; i++) w.push((n - i) + (i % 2 ? 0.4 : 0));
+    const ws = w.reduce((a, b) => a + b, 0);
 
-  for (const ep of episodes) {
-    const cid = creatorIds[ep.creator];
-    const epRow = await db.run('INSERT INTO episodes (creator_id, title, type, published_at) VALUES (?, ?, ?, ?)', [cid, ep.title, ep.type, ep.date]);
-    const epId = epRow.lastInsertRowid;
-    for (const pl of ep.platforms) {
-      await db.run('INSERT INTO content_links (episode_id, platform, url, views, engagement, likes, comments, shares, saves, uv, video_views) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [epId, pl.p, pl.url, pl.v, pl.e, pl.l, pl.c, pl.s, pl.sv, (pl as any).uv || 0, (pl as any).video_views || 0]);
+    for (let i = 0; i < n; i++) {
+      const type = (i % 3 === 0) ? 'Long' : 'Short';
+      const tl = EP_TITLES[type === 'Long' ? 'long' : 'short'];
+      const title = tl[i % tl.length] + ' EP.' + (i + 1);
+      const plats = PSET[i % PSET.length];
+      const epViews = Math.round(c.views * w[i] / ws);
+      const epEng = Math.round(c.eng * w[i] / ws);
+      const pw = plats.map((_, j) => plats.length - j + 0.5);
+      const pws = pw.reduce((a, b) => a + b, 0);
+
+      const epRow = await db.run('INSERT INTO episodes (creator_id, title, type, published_at) VALUES (?, ?, ?, ?)', [cid, title, type, EP_DATES[i % EP_DATES.length]]);
+      const epId = epRow.lastInsertRowid;
+
+      for (let j = 0; j < plats.length; j++) {
+        const views = Math.round(epViews * pw[j] / pws);
+        const eng = Math.round(epEng * pw[j] / pws);
+        // Engagement split into like/comment/share/save (prototype shows engagement as a single number)
+        const likes = Math.round(eng * 0.62);
+        const comments = Math.round(eng * 0.13);
+        const shares = Math.round(eng * 0.15);
+        const saves = eng - likes - comments - shares;
+        // Streamer creators: distribute their UV / Video Views proportionally by view share
+        const uv = c.uv ? Math.round(c.uv * views / c.views) : 0;
+        const videoViews = c.videoViews ? Math.round(c.videoViews * views / c.views) : 0;
+        await db.run(
+          'INSERT INTO content_links (episode_id, platform, url, views, engagement, likes, comments, shares, saves, uv, video_views) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [epId, plats[j], makeLink(plats[j], c.nick, i), views, eng, likes, comments, shares, saves, uv, videoViews]
+        );
+      }
     }
   }
 
-  // Rewards
-  for (const c of creatorData) {
-    const cid = creatorIds[c.name];
-    const pid = progIds[c.program];
-    const amount = Math.round(Math.random() * 150000 + 50000);
-    await db.run('INSERT OR IGNORE INTO rewards (creator_id, program_id, amount) VALUES (?, ?, ?)', [cid, pid, amount]);
+  // Rewards (real amounts from the prototype's export report)
+  for (let i = 0; i < CREATORS.length; i++) {
+    await db.run('INSERT OR IGNORE INTO rewards (creator_id, program_id, amount) VALUES (?, ?, ?)', [creatorIds[i], progIds[CREATORS[i].prog], REWARDS[i]]);
   }
 
-  // Users
-  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Admin User', 'admin', 'admin@creatorhub.th', 'hashed_pw', 'Admin']);
-  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Som Editor', 'som.editor', 'som@creatorhub.th', 'hashed_pw', 'Editor']);
-  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Ploy Manee', 'ploy.manee', 'ploy@creatorhub.th', 'hashed_pw', 'Manager']);
+  // Users (from the prototype's profile/log data)
+  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Admin User', 'admin', 'admin@creatorhub.co', 'hashed_pw', 'Admin']);
+  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Som', 'som.editor', 'som@creatorhub.co', 'hashed_pw', 'Editor']);
+  await db.run('INSERT OR IGNORE INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)', ['Ploy', 'ploy.manager', 'ploy@creatorhub.co', 'hashed_pw', 'Manager']);
 
-  // Audit logs
-  const auditEntries = [
-    { user: 'Admin User', action: 'อนุมัติ Arisa Tan (Instagram)', tag: 'อนุมัติ', color: '#16a34a', detail: 'Approved content link' },
-    { user: 'AI Agent', action: 'อัปเดตยอดวิว Napat Wong', tag: 'AI Refresh', color: '#7c5cff', detail: 'Updated follower counts via AI' },
-    { user: 'Som Editor', action: 'นำเข้ารายงาน report_june.xlsx', tag: 'Upload', color: '#0ea5e9', detail: 'Imported 42 content rows' },
-    { user: 'Admin User', action: 'สร้างโปรแกรม Golden Space Gods', tag: 'ระบบ', color: '#6b6b72', detail: 'Created new program' },
-    { user: 'Ploy Manee', action: 'แก้ไขข้อมูล Kittipong R.', tag: 'แก้ไข', color: '#f59e0b', detail: 'Updated creator profile' },
+  // System log entries from the prototype
+  const logs = [
+    { user: 'AI Agent', action: 'ดึงข้อมูล Followers ของ 8 ครีเอเตอร์', tag: 'AI', color: '#7c5cff', detail: 'AI Auto Refresh' },
+    { user: 'Editor — Som', action: 'อัปโหลดรายงาน report_june.xlsx (4 แถว)', tag: 'UPLOAD', color: '#0ea5e9', detail: 'Report upload' },
+    { user: 'Manager — Ploy', action: 'อนุมัติ Views ของ Arisa Tan (Instagram)', tag: 'APPROVE', color: '#16a34a', detail: 'Approved content data' },
+    { user: 'Admin User', action: 'แก้ไข Engagement ของ Kittipong R. ด้วยตนเอง', tag: 'EDIT', color: '#d97706', detail: 'Manual edit' },
   ];
-  for (const a of auditEntries) {
+  for (const a of logs) {
     await db.run('INSERT INTO audit_logs (user, action, tag, color, detail) VALUES (?, ?, ?, ?, ?)', [a.user, a.action, a.tag, a.color, a.detail]);
   }
 
-  // Review queue
-  const links = await db.all('SELECT id FROM content_links LIMIT 5');
+  // Review queue: a few pending items
+  const links = await db.all('SELECT id FROM content_links ORDER BY id LIMIT 5');
   for (const lnk of links) {
-    await db.run('INSERT INTO review_queue (content_link_id, status, submitted_by) VALUES (?, ?, ?)', [lnk.id, 'pending', 'Som Editor']);
+    await db.run('INSERT INTO review_queue (content_link_id, status, submitted_by) VALUES (?, ?, ?)', [lnk.id, 'pending', 'Som']);
   }
 
-  console.log('Database seeded successfully');
+  console.log('Database seeded successfully (real prototype data)');
 }

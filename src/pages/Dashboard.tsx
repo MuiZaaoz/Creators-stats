@@ -21,7 +21,7 @@ export default function Dashboard() {
     Promise.all([
       api.analytics.overview(),
       api.programs.list(),
-      api.contents.list({ limit: 20 }),
+      api.contents.list({ limit: 200 }),
       api.audit.list({ limit: 8 }),
       api.analytics.byProgram(),
     ]).then(([ov, progs, ct, au, bp]) => {
