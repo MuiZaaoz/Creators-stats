@@ -142,7 +142,7 @@ export default function Rewards() {
                       fontWeight: 700,
                       color: c.cpm < 3 ? 'var(--green)' : c.cpm < 10 ? 'var(--yellow)' : 'var(--red)',
                     }}>
-                      ฿{c.cpm?.toFixed(2)}
+                      ${c.cpm?.toFixed(2)}
                     </span>
                   </td>
                   <td>
@@ -165,7 +165,7 @@ export default function Rewards() {
               {lang === 'th' ? 'แก้ไขงบประมาณ' : 'Edit Budget'} — {editReward.creator_name}
             </div>
             <div className="form-group">
-              <label>{lang === 'th' ? 'จำนวน (฿)' : 'Amount (฿)'}</label>
+              <label>{lang === 'th' ? 'จำนวน ($)' : 'Amount ($)'}</label>
               <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

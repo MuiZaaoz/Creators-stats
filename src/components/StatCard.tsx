@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function StatCard({ label, value, color, sub, currency }: Props) {
-  const display = currency ? '฿' + fmt(value) : fmt(value);
+  const display = currency ? '$' + fmt(value) : fmt(value);
   return (
     <div className="stat-card">
       <div className="stat-label">{label}</div>

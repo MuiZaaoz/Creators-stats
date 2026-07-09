@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { fmt, initials, platformColor, platformInitial, relDate, typeColor } from '../lib/utils';
 import PageHeader from '../components/PageHeader';
 import StatCard from '../components/StatCard';
+import LinkPreview, { PreviewLink } from '../components/LinkPreview';
 
 export default function Dashboard() {
   const { lang } = useAppStore();
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [audit, setAudit] = useState<any[]>([]);
   const [byProgram, setByProgram] = useState<any[]>([]);
   const [selectedProg, setSelectedProg] = useState<number | null>(null);
+  const [preview, setPreview] = useState<PreviewLink | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -84,12 +86,13 @@ export default function Dashboard() {
                   <th>{t('platform')}</th>
                   <th style={{ textAlign: 'right' }}>{t('views')}</th>
                   <th style={{ textAlign: 'right' }}>{t('engagement')}</th>
-                  <th style={{ textAlign: 'right' }}>{t('likes')}</th>
+                  <th style={{ textAlign: 'center' }}>{lang === 'th' ? 'ลิงก์' : 'Link'}</th>
                 </tr>
               </thead>
               <tbody>
                 {progContents.slice(0, 10).map((c, i) => (
-                  <tr key={c.id}>
+                  <tr key={c.id} style={{ cursor: 'pointer' }}
+                    onClick={() => setPreview({ platform: c.platform, url: c.url, title: c.title, creator_name: c.creator_name, views: c.views, engagement: c.engagement, uv: c.uv, video_views: c.video_views })}>
                     <td style={{ color: 'var(--text2)', fontWeight: 700 }}>{i + 1}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -105,7 +108,9 @@ export default function Dashboard() {
                     </td>
                     <td style={{ textAlign: 'right' }} className="num">{fmt(c.views)}</td>
                     <td style={{ textAlign: 'right' }} className="num">{fmt(c.engagement)}</td>
-                    <td style={{ textAlign: 'right' }} className="num">{fmt(c.likes)}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {c.url ? <span className="link-chip">🔗 Preview</span> : <span style={{ color: 'var(--text2)', fontSize: 12 }}>-</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -155,6 +160,8 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {preview && <LinkPreview link={preview} onClose={() => setPreview(null)} />}
     </div>
   );
 }

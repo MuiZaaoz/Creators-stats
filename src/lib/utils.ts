@@ -9,8 +9,9 @@ export function fmtPct(n: number | null | undefined): string {
 }
 
 export function fmtCurrency(n: number | null | undefined): string {
-  if (n == null) return '฿0';
-  return '฿' + Math.round(n).toLocaleString('en-US');
+  if (n == null) return '$0';
+  const hasCents = Math.abs(n - Math.round(n)) > 0.004;
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: 2 });
 }
 
 export function initials(name: string): string {

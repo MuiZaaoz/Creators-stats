@@ -239,6 +239,14 @@ function ReviewCard({ item, t, lang, onApprove, onReject, onEdit }: any) {
           </div>
         )}
       </div>
+      {item.url && (
+        <div style={{ marginBottom: 12 }}>
+          <a href={item.url} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 12, color: 'var(--accent)', wordBreak: 'break-all' }}>
+            🔗 {item.url}
+          </a>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-success" onClick={onApprove}>{lang === 'th' ? 'อนุมัติ' : 'Approve'}</button>
         <button className="btn btn-danger" onClick={onReject}>{lang === 'th' ? 'ตีกลับ' : 'Reject'}</button>

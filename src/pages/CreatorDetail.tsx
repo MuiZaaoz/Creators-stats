@@ -4,6 +4,7 @@ import { useAppStore } from '../store/appStore';
 import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
 import { fmt, initials, platformColor, platformInitial, relDate, typeColor } from '../lib/utils';
+import LinkPreview, { PreviewLink } from '../components/LinkPreview';
 
 export default function CreatorDetail() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function CreatorDetail() {
   const navigate = useNavigate();
   const [creator, setCreator] = useState<any>(null);
   const [editing, setEditing] = useState(false);
+  const [preview, setPreview] = useState<PreviewLink | null>(null);
   const [form, setForm] = useState<any>({});
 
   useEffect(() => {
@@ -150,19 +152,31 @@ export default function CreatorDetail() {
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {ep.links?.map((lnk: any) => (
-                  <div key={lnk.id} style={{
-                    background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px',
-                    display: 'flex', alignItems: 'center', gap: 10, minWidth: 200,
-                  }}>
+                  <div key={lnk.id}
+                    onClick={() => setPreview({ platform: lnk.platform, url: lnk.url, title: ep.title, creator_name: creator.name, views: lnk.views, engagement: lnk.engagement, uv: lnk.uv, video_views: lnk.video_views })}
+                    style={{
+                      background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px',
+                      display: 'flex', alignItems: 'center', gap: 10, minWidth: 200,
+                      cursor: 'pointer', border: '1px solid transparent',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}>
                     <span className="platform-icon" style={{ background: platformColor(lnk.platform), width: 22, height: 22, fontSize: 10 }}>
                       {platformInitial(lnk.platform)}
                     </span>
-                    <div>
-                      <div className="num" style={{ fontWeight: 700 }}>{fmt(lnk.views)}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text2)' }}>
-                        ❤ {fmt(lnk.likes)} · 💬 {fmt(lnk.comments)}
-                        {lnk.uv > 0 && ` · UV: ${fmt(lnk.uv)}`}
+                    <div style={{ minWidth: 0 }}>
+                      <div className="num" style={{ fontWeight: 700 }}>{fmt(lnk.views)}
+                        {lnk.uv > 0 && <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text2)' }}> · UV {fmt(lnk.uv)}</span>}
                       </div>
+                      {lnk.url ? (
+                        <div style={{ fontSize: 11, color: 'var(--accent)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          🔗 {lnk.url.replace(/^https?:\/\/(www\.)?/, '')}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+                          {lnk.video_views > 0 ? `Video Views ${fmt(lnk.video_views)}` : '-'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -171,6 +185,8 @@ export default function CreatorDetail() {
           ))}
         </div>
       </div>
+
+      {preview && <LinkPreview link={preview} onClose={() => setPreview(null)} />}
     </div>
   );
 }

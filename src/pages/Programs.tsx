@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { fmt, initials, platformColor, platformInitial, relDate, typeColor } from '../lib/utils';
 import PageHeader from '../components/PageHeader';
 import StatCard from '../components/StatCard';
+import LinkPreview, { PreviewLink } from '../components/LinkPreview';
 
 export default function Programs() {
   const { lang } = useAppStore();
@@ -16,6 +17,7 @@ export default function Programs() {
   const [tableData, setTableData] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editModal, setEditModal] = useState<any>(null);
+  const [preview, setPreview] = useState<PreviewLink | null>(null);
 
   const load = async () => {
     const [progs, gs] = await Promise.all([api.programs.list(), api.games.list()]);
@@ -141,14 +143,14 @@ export default function Programs() {
                           <td colSpan={4}>
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                               {ep.links?.map((lnk: any) => (
-                                <div key={lnk.id} style={{
-                                  display: 'flex', alignItems: 'center', gap: 5,
-                                  background: 'var(--surface)', borderRadius: 5, padding: '3px 8px',
-                                }}>
+                                <div key={lnk.id} className="link-chip"
+                                  title={lnk.url || undefined}
+                                  onClick={() => setPreview({ platform: lnk.platform, url: lnk.url, title: ep.title, creator_name: c.name, views: lnk.views, engagement: lnk.engagement })}>
                                   <span className="platform-icon" style={{ background: platformColor(lnk.platform), width: 16, height: 16, fontSize: 8 }}>
                                     {platformInitial(lnk.platform)}
                                   </span>
                                   <span className="num" style={{ fontSize: 12, fontWeight: 600 }}>{fmt(lnk.views)}</span>
+                                  {lnk.url && <span style={{ fontSize: 10, color: 'var(--accent)' }}>🔗</span>}
                                 </div>
                               ))}
                             </div>
@@ -172,6 +174,7 @@ export default function Programs() {
           onClose={() => setEditModal(null)}
           onSave={() => { setEditModal(null); load(); }} />
       )}
+      {preview && <LinkPreview link={preview} onClose={() => setPreview(null)} />}
     </div>
   );
 }
@@ -212,7 +215,7 @@ function ProgramModal({ games, t, program, onClose, onSave }: any) {
             </select>
           </div>
           <div className="form-group">
-            <label>{lang === 'th' ? 'สี' : 'Color'}</label>
+            <label>สี / Color</label>
             <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} />
           </div>
         </div>
