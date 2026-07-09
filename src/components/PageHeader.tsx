@@ -1,23 +1,18 @@
 import React from 'react';
 
 interface Props {
-  title: string;
+  title?: string;
   subtitle?: string;
   actions?: React.ReactNode;
 }
 
-export default function PageHeader({ title, subtitle, actions }: Props) {
+// Page titles now live in the Layout topbar (per the design prototype).
+// This component only renders page-level action buttons, right-aligned.
+export default function PageHeader({ actions }: Props) {
+  if (!actions) return null;
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '20px 28px 0',
-      marginBottom: 20,
-    }}>
-      <div>
-        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</h1>
-        {subtitle && <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>{subtitle}</p>}
-      </div>
-      {actions && <div style={{ display: 'flex', gap: 8 }}>{actions}</div>}
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+      {actions}
     </div>
   );
 }

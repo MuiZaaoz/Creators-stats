@@ -112,7 +112,7 @@ td { padding: 10px 12px; border-bottom: 1px solid #f0f0f2; font-size: 13px; vert
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: #fafafb; }
 
-.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.num { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
 .avatar {
   width: 32px; height: 32px;
