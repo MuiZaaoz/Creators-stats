@@ -35,7 +35,7 @@ creatorsRouter.get('/:id', async (req, res) => {
     JOIN content_links cl ON cl.episode_id = e.id
     WHERE e.creator_id = ?
     GROUP BY e.id
-    ORDER BY e.published_at DESC
+    ORDER BY e.id ASC
   `, [req.params.id]);
 
   const parsedEpisodes = episodes.map((ep: any) => ({ ...ep, links: JSON.parse(ep.links) }));

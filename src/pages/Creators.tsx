@@ -1,75 +1,132 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
-import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
-import { fmt, initials, platformColor, platformInitial, typeColor } from '../lib/utils';
-import PageHeader from '../components/PageHeader';
+import { fmt, initials, platformColor, typeColor } from '../lib/utils';
 
 export default function Creators() {
   const { lang } = useAppStore();
-  const t = useT(lang);
+  const t2 = (th: string, en: string) => (lang === 'th' ? th : en);
   const navigate = useNavigate();
+
+  const [rows, setRows] = useState<any[]>([]);
   const [creators, setCreators] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
-  const [filterProg, setFilterProg] = useState('');
+  const [filterProg, setFilterProg] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = () => {
-    Promise.all([api.creators.list(), api.programs.list()]).then(([c, p]) => {
-      setCreators(c);
-      setPrograms(p);
+    Promise.all([api.analytics.byCreator(), api.creators.list(), api.programs.list()]).then(([bc, cs, ps]) => {
+      setRows(bc);
+      setCreators(cs);
+      setPrograms(ps);
       setLoading(false);
     });
   };
-
   useEffect(() => { load(); }, []);
 
-  const filtered = creators.filter(c => {
-    if (filterProg && String(c.program_id) !== filterProg) return false;
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
+  const handleOf = (id: number) => creators.find(c => c.id === id) || {};
+
+  const filtered = rows.filter((r: any) => {
+    if (filterProg) {
+      const prog = programs.find(p => p.id === filterProg);
+      if (!prog || r.program_name !== prog.name) return false;
+    }
+    if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
   return (
-    <div style={{ padding: '20px 28px', flex: 1 }}>
-      <PageHeader
-        title={t('creators')}
-        subtitle={`${creators.length} ${lang === 'th' ? 'ครีเอเตอร์' : 'creators'}`}
-        actions={
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ {t('add')}</button>
-        }
-      />
-
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+    <div style={{ padding: '20px 24px', flex: 1 }}>
+      {/* Filters row */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
-          placeholder={t('search') + '...'}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ width: 220 }}
+          placeholder={t2('ค้นหาชื่อ...', 'Search name...')}
+          value={search} onChange={e => setSearch(e.target.value)}
+          style={{ width: 220, borderRadius: 9 }}
         />
-        <select value={filterProg} onChange={e => setFilterProg(e.target.value)} style={{ width: 180 }}>
-          <option value="">{lang === 'th' ? 'ทุกโปรแกรม' : 'All Programs'}</option>
-          {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        <button onClick={() => setFilterProg(null)} style={{
+          padding: '7px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 600,
+          background: filterProg === null ? 'var(--accent-tint)' : '#fff',
+          color: filterProg === null ? '#4646c6' : '#52525b',
+          border: '1px solid ' + (filterProg === null ? 'var(--accent)' : 'var(--border)'),
+        }}>{t2('ทั้งหมด', 'All')}</button>
+        {programs.map(p => (
+          <button key={p.id} onClick={() => setFilterProg(p.id)} style={{
+            padding: '7px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 600,
+            background: filterProg === p.id ? 'var(--accent-tint)' : '#fff',
+            color: filterProg === p.id ? '#4646c6' : '#52525b',
+            border: '1px solid ' + (filterProg === p.id ? 'var(--accent)' : 'var(--border)'),
+          }}>{p.name}</button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ {t2('เพิ่มครีเอเตอร์', 'Add Creator')}</button>
       </div>
 
-      {loading ? (
-        <div className="empty-state"><div className="spinner" /></div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-          {filtered.map(c => (
-            <CreatorCard key={c.id} creator={c} t={t} lang={lang} onRefresh={load}
-              onClick={() => navigate(`/creators/${c.id}`)} />
-          ))}
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ minWidth: 820 }}>
+            <thead>
+              <tr>
+                <th>CREATOR</th>
+                <th>PROGRAM</th>
+                <th>{t2('ประเภท', 'TYPE')}</th>
+                <th style={{ textAlign: 'right' }}>VIEWS</th>
+                <th style={{ textAlign: 'right' }}>ENGAGEMENT</th>
+                <th style={{ textAlign: 'right' }}>CONTENTS</th>
+                <th style={{ textAlign: 'right' }}>STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7}><div className="empty-state"><div className="spinner" /></div></td></tr>
+              ) : filtered.map((r: any) => {
+                const c = handleOf(r.id);
+                const active = (r.total_views || 0) > 0;
+                return (
+                  <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/creators/${r.id}`)}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="avatar" style={{ background: r.avatar_color, width: 34, height: 34 }}>{initials(r.name)}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13.5 }}>{r.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            {['Facebook', 'YouTube', 'TikTok', 'Instagram'].map(pl => (
+                              <span key={pl} className="platform-icon" style={{ background: platformColor(pl), width: 14, height: 14, fontSize: 7, borderRadius: 3 }}>{pl[0]}</span>
+                            ))}
+                            {c.tiktok_handle && <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 3 }}>@{c.tiktok_handle}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ fontSize: 13 }}>{r.program_name}</td>
+                    <td>
+                      <span className="badge" style={{ background: typeColor(r.type) + '18', color: typeColor(r.type) }}>{r.type}</span>
+                    </td>
+                    <td className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(r.total_views)}</td>
+                    <td className="num" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--accent)' }}>{fmt(r.total_engagement)}</td>
+                    <td className="num" style={{ textAlign: 'right' }}>{fmt(r.episode_count)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: active ? '#16a34a' : '#9a9aa2' }}>
+                        ● {active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
+        <div style={{ padding: '10px 16px', borderTop: '1px solid #f0f0f2', fontSize: 12, color: 'var(--text2)' }}>
+          {t2('แสดง', 'Showing')} <b>{filtered.length}</b> {t2('ครีเอเตอร์', 'creators')}
+        </div>
+      </div>
 
       {showModal && (
-        <CreatorModal programs={programs} t={t} lang={lang}
+        <CreatorModal programs={programs} t2={t2}
           onClose={() => setShowModal(false)}
           onSave={() => { setShowModal(false); load(); }} />
       )}
@@ -77,112 +134,50 @@ export default function Creators() {
   );
 }
 
-function CreatorCard({ creator: c, t, lang, onRefresh, onClick }: any) {
-  const platforms = [
-    { key: 'yt', name: 'YouTube', f: c.yt_followers },
-    { key: 'tt', name: 'TikTok', f: c.tt_followers },
-    { key: 'fb', name: 'Facebook', f: c.fb_followers },
-    { key: 'ig', name: 'Instagram', f: c.ig_followers },
-  ].filter(p => p.f > 0);
-
-  return (
-    <div className="card" style={{ cursor: 'pointer', transition: 'border-color 0.15s' }}
-      onClick={onClick}
-      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <div className="avatar" style={{ background: c.avatar_color, width: 44, height: 44, fontSize: 16 }}>
-          {initials(c.name)}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{c.name}</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <span className="badge" style={{ background: typeColor(c.type) + '22', color: typeColor(c.type) }}>{c.type}</span>
-            {c.program_name && (
-              <span className="badge" style={{ background: (c.program_color || 'var(--accent)') + '22', color: c.program_color || 'var(--accent)' }}>
-                {c.program_name}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-        {platforms.map(p => (
-          <div key={p.key} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'var(--surface2)', borderRadius: 6, padding: '6px 8px',
-          }}>
-            <span className="platform-icon" style={{ background: platformColor(p.name), width: 18, height: 18, fontSize: 9 }}>
-              {platformInitial(p.name)}
-            </span>
-            <span className="num" style={{ fontSize: 12, fontWeight: 600 }}>{fmt(p.f)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CreatorModal({ programs, t, lang, onClose, onSave }: any) {
+function CreatorModal({ programs, t2, onClose, onSave }: any) {
   const [form, setForm] = useState<any>({
     name: '', type: 'Long', program_id: programs[0]?.id || '',
     avatar_color: '#5b5bd6',
     youtube_handle: '', facebook_handle: '', tiktok_handle: '', instagram_handle: '',
   });
-
   const save = async () => {
     if (!form.name) return;
     await api.creators.create(form);
     onSave();
   };
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 18 }}>
-          {t('add')} {t('creators')}
-        </div>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 18 }}>{t2('เพิ่มครีเอเตอร์', 'Add Creator')}</div>
         <div className="form-group">
-          <label>{t('name')}</label>
-          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+          <label>{t2('ชื่อ', 'Name')}</label>
+          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div className="form-group">
-            <label>{t('type')}</label>
+            <label>{t2('ประเภท', 'Type')}</label>
             <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-              <option>Long</option>
-              <option>Short</option>
-              <option>Streamer</option>
+              <option>Long</option><option>Short</option><option>Streamer</option>
             </select>
           </div>
           <div className="form-group">
-            <label>{t('program')}</label>
+            <label>{t2('โปรแกรม', 'Program')}</label>
             <select value={form.program_id} onChange={e => setForm({ ...form, program_id: e.target.value })}>
               {programs.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div className="form-group">
-            <label>YouTube Handle</label>
-            <input value={form.youtube_handle} onChange={e => setForm({ ...form, youtube_handle: e.target.value })} placeholder="@handle" />
           </div>
           <div className="form-group">
             <label>TikTok Handle</label>
             <input value={form.tiktok_handle} onChange={e => setForm({ ...form, tiktok_handle: e.target.value })} placeholder="@handle" />
           </div>
           <div className="form-group">
-            <label>Facebook Handle</label>
-            <input value={form.facebook_handle} onChange={e => setForm({ ...form, facebook_handle: e.target.value })} placeholder="@handle" />
-          </div>
-          <div className="form-group">
-            <label>Instagram Handle</label>
-            <input value={form.instagram_handle} onChange={e => setForm({ ...form, instagram_handle: e.target.value })} placeholder="@handle" />
+            <label>YouTube Handle</label>
+            <input value={form.youtube_handle} onChange={e => setForm({ ...form, youtube_handle: e.target.value })} placeholder="@handle" />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button className="btn btn-secondary" onClick={onClose}>{t('cancel')}</button>
-          <button className="btn btn-primary" onClick={save}>{t('save')}</button>
+          <button className="btn btn-secondary" onClick={onClose}>{t2('ยกเลิก', 'Cancel')}</button>
+          <button className="btn btn-primary" onClick={save}>{t2('บันทึก', 'Save')}</button>
         </div>
       </div>
     </div>

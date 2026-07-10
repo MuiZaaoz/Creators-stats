@@ -59,7 +59,7 @@ programsRouter.get('/:id/table', async (req, res) => {
       JOIN content_links cl ON cl.episode_id = e.id
       WHERE e.creator_id = ?
       GROUP BY e.id
-      ORDER BY e.published_at DESC
+      ORDER BY e.id ASC
     `, [c.id]);
     result.push({ ...c, episodes: episodes.map((e: any) => ({ ...e, links: JSON.parse(e.links) })) });
   }
