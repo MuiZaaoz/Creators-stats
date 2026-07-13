@@ -202,30 +202,192 @@ export default function Collect() {
         </div>
       )}
 
-      {activeTab === 'ai' && (
-        <div className="card" style={{ maxWidth: 500 }}>
-          <div style={{ fontWeight: 700, marginBottom: 12 }}>AI Refresh</div>
-          <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
-            {lang === 'th' ? 'ใช้ AI อัปเดตข้อมูล Follower อัตโนมัติจาก handle ที่ลงทะเบียนไว้' : 'Use AI to auto-update follower counts from registered handles.'}
+      {activeTab === 'ai' && <AiRefreshTab lang={lang} />}
+
+      {activeTab === 'web' && <WebSubmitTab lang={lang} creators={creators} />}
+    </div>
+  );
+}
+
+/* ================= AI Refresh ================= */
+function AiRefreshTab({ lang }: any) {
+  const t2 = (th: string, en: string) => (lang === 'th' ? th : en);
+  const [status, setStatus] = useState<any>(null);
+  const [selected, setSelected] = useState<Record<number, boolean>>({});
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<Record<number, string>>({});
+  const [fatal, setFatal] = useState('');
+
+  const load = () => api.ai.status().then(setStatus);
+  useEffect(() => { load(); }, []);
+
+  const toggleAll = (on: boolean) => {
+    const next: Record<number, boolean> = {};
+    if (on) (status?.creators || []).forEach((c: any) => { if (c.linked > 0) next[c.id] = true; });
+    setSelected(next);
+  };
+
+  const run = async () => {
+    const ids = (status?.creators || []).filter((c: any) => selected[c.id]).map((c: any) => c.id);
+    if (ids.length === 0) return;
+    setRunning(true); setFatal('');
+    for (const id of ids) {
+      let remaining = 1, batches = 0;
+      while (remaining > 0 && batches < 12) {
+        setProgress(p => ({ ...p, [id]: t2(`กำลังอัปเดต... (รอบที่ ${batches + 1})`, `Updating... (batch ${batches + 1})`) }));
+        try {
+          const r = await api.ai.refresh(id);
+          remaining = r.remaining || 0;
+          batches++;
+          setProgress(p => ({ ...p, [id]: t2(`อัปเดตแล้ว ${r.updated}/${r.batch} ลิงก์${remaining ? ` · เหลือ ${remaining}` : ' · เสร็จ ✓'}`, `Updated ${r.updated}/${r.batch}${remaining ? ` · ${remaining} left` : ' · done ✓'}`) }));
+        } catch (e: any) {
+          const msg = String(e?.message || e);
+          setProgress(p => ({ ...p, [id]: '✕ ' + t2('ผิดพลาด', 'failed') }));
+          if (msg.includes('400')) { setFatal('no_key'); setRunning(false); return; }
+          break;
+        }
+      }
+      await load();
+    }
+    setRunning(false);
+  };
+
+  if (!status) return <div className="empty-state"><div className="spinner" /></div>;
+
+  return (
+    <div style={{ maxWidth: 760 }}>
+      {!status.configured && (
+        <div className="card" style={{ marginBottom: 14, borderColor: '#fbbf24', background: '#fffbeb' }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>⚙️ {t2('ต้องตั้งค่า API Key ก่อนใช้งาน', 'API key required')}</div>
+          <div style={{ fontSize: 13, color: '#78716c', lineHeight: 1.7 }}>
+            {t2('AI Refresh ใช้ Claude AI เข้าไปอ่านยอดจากคลิปจริง — ต้องมี Anthropic API key:', 'AI Refresh uses Claude AI to read live stats — an Anthropic API key is required:')}
+            <br />1. {t2('สร้าง key ที่', 'Create a key at')} <b>console.anthropic.com</b> → API Keys
+            <br />2. Render → creators-stats → <b>Environment</b> → {t2('เพิ่ม', 'add')} <b>ANTHROPIC_API_KEY</b> = <span className="num">sk-ant-...</span>
+            <br />3. Save Changes ({t2('ระบบจะ redeploy เอง', 'auto redeploys')})
           </div>
-          <button className="btn btn-primary">
-            {lang === 'th' ? 'เริ่ม AI Refresh' : 'Start AI Refresh'}
-          </button>
         </div>
       )}
+      {fatal === 'no_key' && status.configured === false && null}
 
-      {activeTab === 'web' && (
-        <div className="card" style={{ maxWidth: 500 }}>
-          <div style={{ fontWeight: 700, marginBottom: 12 }}>Web Submit Link</div>
-          <div style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 16 }}>
-            {lang === 'th' ? 'สร้างลิงก์ให้ครีเอเตอร์กรอกข้อมูลด้วยตัวเอง' : 'Generate a link for creators to self-submit their data.'}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700 }}>{t2('เลือกครีเอเตอร์ที่ต้องการอัปเดต', 'Select creators to refresh')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)' }}>
+              {t2('AI จะเข้าชมคลิปแล้วดึง Views + Engagement (Like·Comment·Share·Save) และ Followers', 'AI visits each clip and pulls Views + Engagement (Like·Comment·Share·Save) and Followers')}
+            </div>
           </div>
-          <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '10px 14px', fontFamily: 'monospace', fontSize: 13, marginBottom: 12, color: 'var(--accent2)' }}>
-            https://hub.example.com/submit/abc123
+          <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => toggleAll(true)}>{t2('เลือกทั้งหมด', 'All')}</button>
+          <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => toggleAll(false)}>{t2('ล้าง', 'None')}</button>
+          <button className="btn btn-primary" disabled={running || !Object.values(selected).some(Boolean)} onClick={run}>
+            {running ? t2('กำลังทำงาน...', 'Running...') : t2('เริ่ม AI Refresh', 'Start AI Refresh')}
+          </button>
+        </div>
+
+        {(status.creators || []).map((c: any) => (
+          <label key={c.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+            borderBottom: '1px solid #f0f0f2', cursor: c.linked > 0 ? 'pointer' : 'default',
+            opacity: c.linked > 0 ? 1 : 0.45,
+          }}>
+            <input type="checkbox" disabled={c.linked === 0 || running}
+              checked={!!selected[c.id]}
+              onChange={e => setSelected({ ...selected, [c.id]: e.target.checked })}
+              style={{ width: 15, height: 15, accentColor: 'var(--accent)' }} />
+            <div className="avatar" style={{ background: c.avatar_color, width: 30, height: 30, fontSize: 11 }}>{initialsOf(c.name)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text2)' }}>
+                {c.linked} {t2('ลิงก์', 'links')} · {t2('อัปเดตโดย AI แล้ว', 'AI refreshed')} {c.refreshed}/{c.linked}
+              </div>
+            </div>
+            {progress[c.id] && (
+              <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>{progress[c.id]}</span>
+            )}
+            <span className="num" style={{ fontSize: 11.5, color: c.ai_updated_at ? '#16a34a' : 'var(--text2)', whiteSpace: 'nowrap' }}>
+              {c.ai_updated_at
+                ? `🤖 ${t2('ล่าสุด', 'last')} ${c.ai_updated_at.slice(5, 16)}`
+                : t2('ยังไม่เคยอัปเดต', 'never refreshed')}
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ================= Web Submit ================= */
+function WebSubmitTab({ lang, creators }: any) {
+  const t2 = (th: string, en: string) => (lang === 'th' ? th : en);
+  const [tokens, setTokens] = useState<any[]>([]);
+  const [creatorId, setCreatorId] = useState<string>('');
+  const [copied, setCopied] = useState('');
+
+  const load = () => api.submit.tokens().then(setTokens);
+  useEffect(() => { load(); }, []);
+
+  const linkOf = (token: string) => `${location.origin}/submit/${token}`;
+
+  const create = async () => {
+    await api.submit.createToken({ creator_id: creatorId || null });
+    load();
+  };
+
+  const copy = (token: string) => {
+    navigator.clipboard?.writeText(linkOf(token));
+    setCopied(token);
+    setTimeout(() => setCopied(''), 1800);
+  };
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Web Submit Link</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 14 }}>
+          {t2('สร้างลิงก์ส่งให้ครีเอเตอร์กรอกข้อมูลเอง — ข้อมูลที่ส่งจะเข้าคิวตรวจสอบก่อนเสมอ', 'Create a link for creators to self-submit — entries always go to the review queue first')}
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ margin: 0, flex: 1 }}>
+            <label>{t2('สำหรับครีเอเตอร์', 'For creator')}</label>
+            <select value={creatorId} onChange={e => setCreatorId(e.target.value)}>
+              <option value="">{t2('— ทุกคน (ให้เลือกชื่อเองในฟอร์ม) —', '— Anyone (picks name in the form) —')}</option>
+              {creators.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
-          <button className="btn btn-secondary">{lang === 'th' ? 'คัดลอกลิงก์' : 'Copy Link'}</button>
+          <button className="btn btn-primary" onClick={create}>+ {t2('สร้างลิงก์', 'Create Link')}</button>
+        </div>
+      </div>
+
+      {tokens.length > 0 && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', fontWeight: 700, borderBottom: '1px solid var(--border)' }}>
+            {t2('ลิงก์ที่ใช้งานอยู่', 'Active links')} ({tokens.length})
+          </div>
+          {tokens.map((tk: any) => (
+            <div key={tk.token} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid #f0f0f2' }}>
+              <span className="badge" style={{
+                background: tk.creator_id ? 'var(--accent-tint)' : '#f3f3f5',
+                color: tk.creator_id ? '#4646c6' : '#52525b', flexShrink: 0,
+              }}>
+                {tk.creator_name || t2('ทุกคน', 'Anyone')}
+              </span>
+              <a href={linkOf(tk.token)} target="_blank" rel="noopener noreferrer"
+                className="num" style={{ flex: 1, fontSize: 12, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {linkOf(tk.token)}
+              </a>
+              <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => copy(tk.token)}>
+                {copied === tk.token ? '✓ ' + t2('คัดลอกแล้ว', 'Copied') : t2('คัดลอก', 'Copy')}
+              </button>
+              <button className="btn btn-ghost" style={{ color: 'var(--red)', fontSize: 12 }}
+                onClick={async () => { await api.submit.deleteToken(tk.token); load(); }}>✕</button>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
+}
+
+function initialsOf(name: string) {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }

@@ -151,5 +151,20 @@ export async function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       reviewed_at TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS submit_tokens (
+      token TEXT PRIMARY KEY,
+      creator_id INTEGER REFERENCES creators(id),
+      label TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
+
+  // Additive migrations for existing databases (ignore "duplicate column" errors)
+  for (const sql of [
+    `ALTER TABLE creators ADD COLUMN ai_updated_at TEXT`,
+    `ALTER TABLE content_links ADD COLUMN ai_updated_at TEXT`,
+  ]) {
+    try { await db.exec(sql); } catch { /* column already exists */ }
+  }
 }

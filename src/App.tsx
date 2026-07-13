@@ -14,11 +14,14 @@ import Rewards from './pages/Rewards';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
+import SubmitPage from './pages/SubmitPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public creator submission page (no admin chrome) */}
+        <Route path="/submit/:token" element={<SubmitPage />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="creators" element={<Creators />} />

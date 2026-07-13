@@ -77,6 +77,11 @@ export default function CreatorDetail() {
             {creator.game_name && (
               <span className="badge" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>{creator.game_name}</span>
             )}
+            {creator.ai_updated_at && (
+              <span className="badge num" style={{ background: '#f3e8ff', color: '#7c5cff' }}>
+                🤖 AI {lang === 'th' ? 'อัปเดตล่าสุด' : 'last update'} {creator.ai_updated_at.slice(0, 16)}
+              </span>
+            )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             {[

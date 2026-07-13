@@ -75,6 +75,17 @@ export const api = {
     updateRole: (id: number, body: any) => put<any>(`/users/roles/${id}`, body),
     createRole: (body: any) => post<any>('/users/roles', body),
   },
+  ai: {
+    status: () => get<any>('/ai/status'),
+    refresh: (creatorId: number) => post<any>(`/ai/refresh/${creatorId}`, {}),
+  },
+  submit: {
+    tokens: () => get<any[]>('/submit/tokens'),
+    createToken: (body: any) => post<any>('/submit/tokens', body),
+    deleteToken: (token: string) => del<any>(`/submit/tokens/${token}`),
+    info: (token: string) => get<any>(`/submit/info/${token}`),
+    entry: (token: string, body: any) => post<any>(`/submit/entry/${token}`, body),
+  },
   export: {
     preview: (params?: Record<string, any>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
