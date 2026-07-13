@@ -216,7 +216,6 @@ function AiRefreshTab({ lang }: any) {
   const [selected, setSelected] = useState<Record<number, boolean>>({});
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<Record<number, string>>({});
-  const [fatal, setFatal] = useState('');
 
   const load = () => api.ai.status().then(setStatus);
   useEffect(() => { load(); }, []);
@@ -230,20 +229,18 @@ function AiRefreshTab({ lang }: any) {
   const run = async () => {
     const ids = (status?.creators || []).filter((c: any) => selected[c.id]).map((c: any) => c.id);
     if (ids.length === 0) return;
-    setRunning(true); setFatal('');
+    setRunning(true);
     for (const id of ids) {
-      let remaining = 1, batches = 0;
-      while (remaining > 0 && batches < 12) {
-        setProgress(p => ({ ...p, [id]: t2(`กำลังอัปเดต... (รอบที่ ${batches + 1})`, `Updating... (batch ${batches + 1})`) }));
+      let remaining = 1, batches = 0, okTotal = 0, tried = 0;
+      while (remaining > 0 && batches < 30) {
+        setProgress(p => ({ ...p, [id]: t2(`กำลังเข้าดูคลิป... (ชุดที่ ${batches + 1})`, `Visiting clips... (batch ${batches + 1})`) }));
         try {
           const r = await api.ai.refresh(id);
           remaining = r.remaining || 0;
-          batches++;
-          setProgress(p => ({ ...p, [id]: t2(`อัปเดตแล้ว ${r.updated}/${r.batch} ลิงก์${remaining ? ` · เหลือ ${remaining}` : ' · เสร็จ ✓'}`, `Updated ${r.updated}/${r.batch}${remaining ? ` · ${remaining} left` : ' · done ✓'}`) }));
-        } catch (e: any) {
-          const msg = String(e?.message || e);
+          batches++; okTotal += r.updated || 0; tried += r.batch || 0;
+          setProgress(p => ({ ...p, [id]: t2(`อ่านได้ ${okTotal}/${tried} ลิงก์${remaining ? ` · เหลือ ${remaining}` : ' · เสร็จ ✓'}`, `Read ${okTotal}/${tried}${remaining ? ` · ${remaining} left` : ' · done ✓'}`) }));
+        } catch {
           setProgress(p => ({ ...p, [id]: '✕ ' + t2('ผิดพลาด', 'failed') }));
-          if (msg.includes('400')) { setFatal('no_key'); setRunning(false); return; }
           break;
         }
       }
@@ -256,25 +253,12 @@ function AiRefreshTab({ lang }: any) {
 
   return (
     <div style={{ maxWidth: 760 }}>
-      {!status.configured && (
-        <div className="card" style={{ marginBottom: 14, borderColor: '#fbbf24', background: '#fffbeb' }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>⚙️ {t2('ต้องตั้งค่า API Key ก่อนใช้งาน', 'API key required')}</div>
-          <div style={{ fontSize: 13, color: '#78716c', lineHeight: 1.7 }}>
-            {t2('AI Refresh ใช้ Claude AI เข้าไปอ่านยอดจากคลิปจริง — ต้องมี Anthropic API key:', 'AI Refresh uses Claude AI to read live stats — an Anthropic API key is required:')}
-            <br />1. {t2('สร้าง key ที่', 'Create a key at')} <b>console.anthropic.com</b> → API Keys
-            <br />2. Render → creators-stats → <b>Environment</b> → {t2('เพิ่ม', 'add')} <b>ANTHROPIC_API_KEY</b> = <span className="num">sk-ant-...</span>
-            <br />3. Save Changes ({t2('ระบบจะ redeploy เอง', 'auto redeploys')})
-          </div>
-        </div>
-      )}
-      {fatal === 'no_key' && status.configured === false && null}
-
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700 }}>{t2('เลือกครีเอเตอร์ที่ต้องการอัปเดต', 'Select creators to refresh')}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-              {t2('AI จะเข้าชมคลิปแล้วดึง Views + Engagement (Like·Comment·Share·Save) และ Followers', 'AI visits each clip and pulls Views + Engagement (Like·Comment·Share·Save) and Followers')}
+              {t2('AI จะเข้าดูหน้าคลิปเหมือนคนดู (เว้นระยะ 3-7 วิ/ลิงก์) แล้วอ่าน Views + Engagement (Like·Comment·Share·Save) และ Followers — ไม่ใช้ API key', 'AI visits each clip page like a human (3-7s pause per link) and reads Views + Engagement (Like·Comment·Share·Save) and Followers — no API key')}
             </div>
           </div>
           <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => toggleAll(true)}>{t2('เลือกทั้งหมด', 'All')}</button>
