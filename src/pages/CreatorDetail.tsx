@@ -85,10 +85,10 @@ export default function CreatorDetail() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             {[
-              { p: 'YouTube', f: creator.yt_followers, h: creator.youtube_handle, key: 'yt_followers' },
-              { p: 'TikTok', f: creator.tt_followers, h: creator.tiktok_handle, key: 'tt_followers' },
-              { p: 'Facebook', f: creator.fb_followers, h: creator.facebook_handle, key: 'fb_followers' },
-              { p: 'Instagram', f: creator.ig_followers, h: creator.instagram_handle, key: 'ig_followers' },
+              { p: 'YouTube', f: creator.yt_followers, h: creator.youtube_handle, key: 'yt_followers', hkey: 'youtube_handle' },
+              { p: 'TikTok', f: creator.tt_followers, h: creator.tiktok_handle, key: 'tt_followers', hkey: 'tiktok_handle' },
+              { p: 'Facebook', f: creator.fb_followers, h: creator.facebook_handle, key: 'fb_followers', hkey: 'facebook_handle' },
+              { p: 'Instagram', f: creator.ig_followers, h: creator.instagram_handle, key: 'ig_followers', hkey: 'instagram_handle' },
             ].map(pl => (
               <div key={pl.p} style={{
                 background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px',
@@ -98,7 +98,13 @@ export default function CreatorDetail() {
                   <span className="platform-icon" style={{ background: platformColor(pl.p), width: 18, height: 18, fontSize: 9 }}>
                     {platformInitial(pl.p)}
                   </span>
-                  <span style={{ fontSize: 11, color: 'var(--text2)' }}>{pl.h ? '@' + pl.h : '-'}</span>
+                  {editing ? (
+                    <input value={form[pl.hkey] || ''} placeholder={lang === 'th' ? 'ชื่อเพจ/บัญชี' : 'page/account'}
+                      onChange={e => setForm({ ...form, [pl.hkey]: e.target.value })}
+                      style={{ fontSize: 11, padding: '2px 6px', flex: 1, minWidth: 0 }} />
+                  ) : (
+                    <span style={{ fontSize: 11, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pl.h ? '@' + pl.h : '-'}</span>
+                  )}
                 </div>
                 {editing ? (
                   <input value={form[pl.key] || 0} type="number"

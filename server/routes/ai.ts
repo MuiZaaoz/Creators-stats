@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
-import { scrapeClip, scrapeFollowers, humanDelay } from '../scrape.js';
+import { scrapeClip, scrapeFollowers, humanDelay, fbHandleFromUrl, igHandleFromUrl } from '../scrape.js';
 
 export const aiRouter = Router();
 
@@ -53,10 +53,27 @@ aiRouter.post('/refresh/:creatorId', async (req, res) => {
   let updated = 0;
   const details: any[] = [];
 
+  // Learn FB page / IG account names from this creator's own links when not set
+  let fbHandle = (creator.facebook_handle || '').replace(/^@/, '') || null;
+  let igHandle = (creator.instagram_handle || '').replace(/^@/, '') || null;
+  if (!fbHandle || !igHandle) {
+    const allUrls = await db.all(`
+      SELECT cl.url FROM content_links cl
+      JOIN episodes e ON cl.episode_id = e.id
+      WHERE e.creator_id = ? AND cl.url != ''`, [creator.id]);
+    for (const r of allUrls as any[]) {
+      if (!fbHandle) fbHandle = fbHandleFromUrl(r.url);
+      if (!igHandle) igHandle = igHandleFromUrl(r.url);
+    }
+    if (fbHandle && !creator.facebook_handle) await db.run('UPDATE creators SET facebook_handle=? WHERE id=?', [fbHandle, creator.id]);
+    if (igHandle && !creator.instagram_handle) await db.run('UPDATE creators SET instagram_handle=? WHERE id=?', [igHandle, creator.id]);
+  }
+  const ctx = { fbHandle, igHandle };
+
   for (let i = 0; i < links.length; i++) {
     const link = links[i];
     if (i > 0) await humanDelay(); // pause between pages, like a person browsing
-    const s = await scrapeClip(link.platform, link.url);
+    const s = await scrapeClip(link.platform, link.url, ctx);
 
     if (s.ok || s.likes != null) {
       // keep existing value when a field could not be read
@@ -85,16 +102,25 @@ aiRouter.post('/refresh/:creatorId', async (req, res) => {
     followers = {};
     if (creator.tiktok_handle) {
       await humanDelay();
-      followers.tiktok = await scrapeFollowers('tiktok', creator.tiktok_handle);
+      followers.tiktok = await scrapeFollowers('tiktok', creator.tiktok_handle.replace(/^@/, ''));
     }
     if (creator.youtube_handle) {
       await humanDelay();
-      followers.youtube = await scrapeFollowers('youtube', creator.youtube_handle);
+      followers.youtube = await scrapeFollowers('youtube', creator.youtube_handle.replace(/^@/, ''));
     }
-    if (followers.tiktok != null || followers.youtube != null) {
+    if (fbHandle) {
+      await humanDelay();
+      followers.facebook = await scrapeFollowers('facebook', fbHandle);
+    }
+    if (igHandle) {
+      await humanDelay();
+      followers.instagram = await scrapeFollowers('instagram', igHandle);
+    }
+    if (followers.tiktok != null || followers.youtube != null || followers.facebook != null || followers.instagram != null) {
       await db.run(
-        `UPDATE creators SET tt_followers=COALESCE(?, tt_followers), yt_followers=COALESCE(?, yt_followers) WHERE id=?`,
-        [followers.tiktok ?? null, followers.youtube ?? null, creator.id]
+        `UPDATE creators SET tt_followers=COALESCE(?, tt_followers), yt_followers=COALESCE(?, yt_followers),
+           fb_followers=COALESCE(?, fb_followers), ig_followers=COALESCE(?, ig_followers) WHERE id=?`,
+        [followers.tiktok ?? null, followers.youtube ?? null, followers.facebook ?? null, followers.instagram ?? null, creator.id]
       );
     }
   }
